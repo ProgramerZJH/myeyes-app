@@ -20,61 +20,78 @@ class Help extends StatefulWidget {
   State<Help> createState() => _HelpState();
 }
 
+/// Help页面的状态管理类
 class _HelpState extends State<Help> {
-  // 添加状态变量来存储当前选择的城市
+  // 状态变量：存储当前选择的城市，默认为重庆
   String selectedCity = "重庆";
+  // 天气服务实例，用于获取天气数据
   final WeatherService _weatherService = WeatherService();
+  // 存储天气预报数据的列表
   List<Map<String, dynamic>> weatherData = [];
+  // 存储省份和对应城市的Map，格式：{省份: [城市列表]}
   Map<String, List<String>> cityData = {};
+  // 存储当前选择的省份
   String selectedProvince = '';
 
   @override
   void initState() {
     super.initState();
+    // 初始化时获取位置信息和加载城市数据
     _initializeLocation();
     _loadCityData();
   }
 
+  /// 初始化位置信息
+  /// 检查并请求位置权限，获取当前位置的天气信息
   Future<void> _initializeLocation() async {
     try {
+      // 检查位置权限状态
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        // 如果权限被拒绝，请求权限
         permission = await Geolocator.requestPermission();
       }
 
+      // 如果有位置权限（使用中或始终允许）
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
+        // 获取当前位置
         Position position = await Geolocator.getCurrentPosition();
         // TODO: 需要添加一个方法来根据经纬度获取adcode
-        // 这里暂时使用默认值
+        // 暂时使用重庆的adcode作为默认值
         String adcode = "500000"; // 重庆市的adcode
         await _updateWeather(adcode);
       }
     } catch (e) {
       print('定位错误: $e');
-      // 使用默认城市
+      // 发生错误时使用默认城市（重庆）
       await _updateWeather("500000");
     }
   }
 
+  /// 加载城市数据
+  /// 从API获取所有省份和城市的数据，并更新状态
   Future<void> _loadCityData() async {
     try {
+      // 获取行政区划数据
       final districtData = await _weatherService.getDistrict();
       if (districtData['districts'] != null &&
           districtData['districts'].isNotEmpty) {
+        // 创建临时Map存储省份和城市数据
         Map<String, List<String>> tempCityData = {};
 
-        // 遍历省份
+        // 遍历所有省份
         for (var province in districtData['districts'][0]['districts']) {
           String provinceName = province['name'];
           tempCityData[provinceName] = [];
 
-          // 遍历城市
+          // 遍历该省份下的所有城市
           for (var city in province['districts']) {
             tempCityData[provinceName]!.add(city['name']);
           }
         }
 
+        // 更新状态，触发UI重建
         setState(() {
           cityData = tempCityData;
         });
@@ -82,6 +99,7 @@ class _HelpState extends State<Help> {
     } catch (e) {
       print('加载城市数据错误: $e');
       if (mounted) {
+        // 显示错误提示
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载城市数据失败: $e')),
         );
@@ -89,10 +107,15 @@ class _HelpState extends State<Help> {
     }
   }
 
+  /// 更新天气信息
+  /// [adcode] 城市的行政区划代码
+  /// 根据adcode获取并更新天气数据
   Future<void> _updateWeather(String adcode) async {
     try {
+      // 获取天气预报数据
       final weather = await _weatherService.getWeather(adcode);
       if (weather['forecasts'] != null && weather['forecasts'].isNotEmpty) {
+        // 更新状态：天气数据和选中的城市
         setState(() {
           weatherData =
               List<Map<String, dynamic>>.from(weather['forecasts'][0]['casts']);
@@ -104,14 +127,16 @@ class _HelpState extends State<Help> {
     }
   }
 
+  /// 检查并请求电话权限
+  /// 用于拨打紧急电话前的权限检查
   Future<void> _checkAndRequestPermission() async {
-    // 检查电话权限
+    // 检查电话权限状态
     var status = await Permission.phone.status;
     if (!status.isGranted) {
-      // 请求权限
+      // 如果没有权限，请求权限
       status = await Permission.phone.request();
       if (!status.isGranted) {
-        // 用户拒绝了权限
+        // 用户拒绝了权限请求
         return;
       }
     }
@@ -122,7 +147,7 @@ class _HelpState extends State<Help> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('紧急援助电话'),
+          title: const Text('紧急援助(SOS)'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -219,7 +244,11 @@ class _HelpState extends State<Help> {
     );
   }
 
+  /// 显示省份选择对话框
+  /// 如果城市数据未加载完成，显示提示信息
+  /// 否则显示可选择的省份列表
   void _showProvinceDialog() {
+    // 检查城市数据是否已加载
     if (cityData.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('城市数据加载中，请稍后重试')),
@@ -227,6 +256,7 @@ class _HelpState extends State<Help> {
       return;
     }
 
+    // 显示省份选择对话框
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -235,13 +265,14 @@ class _HelpState extends State<Help> {
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              // 将省份Map的键转换为ListTile列表
               children: cityData.keys.map((province) {
                 return ListTile(
                   title: Text(province),
                   onTap: () {
-                    Navigator.pop(context);
-                    selectedProvince = province;
-                    _showCityDialog(province);
+                    Navigator.pop(context); // 关闭省份选择对话框
+                    selectedProvince = province; // 更新选中的省份
+                    _showCityDialog(province); // 显示对应省份的城市列表
                   },
                 );
               }).toList(),
@@ -252,9 +283,14 @@ class _HelpState extends State<Help> {
     );
   }
 
+  /// 显示城市选择对话框
+  /// [province] 选中的省份名称
+  /// 根据选中的省份获取并显示对应的城市列表
   void _showCityDialog(String province) async {
     try {
+      // 获取指定省份的城市数据
       final cityData = await _weatherService.getDistrict(keywords: province);
+      // 检查返回的数据是否有效
       if (cityData['districts'] != null &&
           cityData['districts'].isNotEmpty &&
           cityData['districts'][0]['districts'] != null) {
@@ -266,16 +302,17 @@ class _HelpState extends State<Help> {
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  // 将城市数据转换为ListTile列表
                   children:
                       cityData['districts'][0]['districts'].map<Widget>((city) {
                     return ListTile(
                       title: Text(city['name']),
                       onTap: () async {
                         setState(() {
-                          selectedCity = city['name'];
+                          selectedCity = city['name']; // 更新选中的城市
                         });
-                        await _updateWeather(city['adcode']);
-                        Navigator.pop(context);
+                        await _updateWeather(city['adcode']); // 更新天气数据
+                        Navigator.pop(context); // 关闭城市选择对话框
                       },
                     );
                   }).toList(),
@@ -288,6 +325,7 @@ class _HelpState extends State<Help> {
     } catch (e) {
       print('获取城市数据错误: $e');
       if (mounted) {
+        // 显示错误提示
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('获取城市数据失败: $e')),
         );
@@ -295,8 +333,10 @@ class _HelpState extends State<Help> {
     }
   }
 
-  // 添加显示天气详情对话框的方法
+  /// 显示天气详情对话框
+  /// 展示选中城市的四日天气预报信息
   void _showWeatherDetailsDialog() {
+    // 检查天气数据是否已加载
     if (weatherData.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('天气数据加载中...')),
@@ -304,6 +344,7 @@ class _HelpState extends State<Help> {
       return;
     }
 
+    // 显示天气详情对话框
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -311,12 +352,13 @@ class _HelpState extends State<Help> {
           title: Text('$selectedCity 四日天气'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            // 将天气数据转换为ListTile列表
             children: weatherData.map((weather) {
               return ListTile(
                 title: Text('${weather['date']} ${weather['week']}'),
                 subtitle: Text(
                   '日间: ${weather['daytemp']}° ${weather['dayweather']}\n'
-                  '夜间: ${weather['nighttemp']}° ${weather['nightweather']}',
+                  '夜��: ${weather['nighttemp']}° ${weather['nightweather']}',
                   style: const TextStyle(fontSize: 14),
                 ),
               );
