@@ -23,7 +23,7 @@ class Help extends StatefulWidget {
 /// Help页面的状态管理类
 class _HelpState extends State<Help> {
   // 状态变量：存储当前选择的城市，默认为重庆
-  String selectedCity = "重庆";
+  String selectedCity = '北京';
   // 天气服务实例，用于获取天气数据
   final WeatherService _weatherService = WeatherService();
   // 存储天气预报数据的列表
@@ -33,6 +33,12 @@ class _HelpState extends State<Help> {
   // 存储当前选择的省份
   String selectedProvince = '';
 
+  // 添加本地缓存变量
+  String? _lastKnownLocation;
+  DateTime? _lastLocationUpdate;
+  final Duration _locationCacheDuration =
+      const Duration(minutes: 5); // 位置信息缓存5分钟
+
   @override
   void initState() {
     super.initState();
@@ -41,11 +47,22 @@ class _HelpState extends State<Help> {
     _loadCityData();
   }
 
-  /// 初始化位置信息
-  /// 检查并请求位置权限，获取当前位置的天气信息
+  /// 检查位置缓存是否有效
+  bool _isLocationCacheValid() {
+    if (_lastLocationUpdate == null) return false;
+    final difference = DateTime.now().difference(_lastLocationUpdate!);
+    return difference < _locationCacheDuration;
+  }
+
+  /// 初始化位置信息（带缓存）
   Future<void> _initializeLocation() async {
     try {
-      // 检查位置权限状态
+      // 检查缓存的位置信息是否有效
+      if (_isLocationCacheValid() && _lastKnownLocation != null) {
+        await _updateWeather(_lastKnownLocation!);
+        return;
+      }
+
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         // 如果权限被拒绝，请求权限
@@ -57,15 +74,22 @@ class _HelpState extends State<Help> {
           permission == LocationPermission.always) {
         // 获取当前位置
         Position position = await Geolocator.getCurrentPosition();
-        // TODO: 需要添加一个方法来根据经纬度获取adcode
-        // 暂时使用重庆的adcode作为默认值
-        String adcode = "500000"; // 重庆市的adcode
+        // 使用新添加的方法获取adcode
+        String adcode = await _weatherService.getAdcodeFromLocation(
+          position.latitude,
+          position.longitude,
+        );
+
+        // 更新位置缓存
+        _lastKnownLocation = adcode;
+        _lastLocationUpdate = DateTime.now();
+
         await _updateWeather(adcode);
       }
     } catch (e) {
       print('定位错误: $e');
-      // 发生错误时使用默认城市（重庆）
-      await _updateWeather("500000");
+      // 发生错误时使用默认城市（北京）
+      await _updateWeather("110000");
     }
   }
 
@@ -358,7 +382,7 @@ class _HelpState extends State<Help> {
                 title: Text('${weather['date']} ${weather['week']}'),
                 subtitle: Text(
                   '日间: ${weather['daytemp']}° ${weather['dayweather']}\n'
-                  '夜��: ${weather['nighttemp']}° ${weather['nightweather']}',
+                  '夜间: ${weather['nighttemp']}° ${weather['nightweather']}',
                   style: const TextStyle(fontSize: 14),
                 ),
               );
@@ -456,7 +480,7 @@ class _HelpState extends State<Help> {
                     ),
                     // 右侧城市选择按钮
                     SizedBox(
-                      width: 80,
+                      width: 100,
                       height: 60,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
