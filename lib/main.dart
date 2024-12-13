@@ -37,9 +37,14 @@ Future<void> main() async {
 }
 
 //------------------------------构建主程序----------------------------------------
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -56,22 +61,102 @@ class MyApp extends StatelessWidget {
           onSurface: Colors.white, // 设置表面上的文本颜色
         ),
       ),
-      home: Scaffold(
-        appBar: AppBar(
+      home: Builder(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15), // 设置圆角半径为 15
+              borderRadius: BorderRadius.circular(15),
             ),
             backgroundColor: Colors.black,
             title: const Center(
-                child: Text(
-              '视途无忧',
-              style: TextStyle(
-                color: Colors.white, // 设置标题文字颜色为白色
-                fontWeight: FontWeight.bold,
+              child: Text(
+                '视途无忧',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ))),
-        body: const Center(
-          child: MyHomePage(),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 15),
+                child: Container(
+                  height: 35,
+                  width: 35,
+                  decoration: const BoxDecoration(
+                    color: Colors.grey,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          final ipController = TextEditingController();
+                          return AlertDialog(
+                            backgroundColor: Colors.yellow,
+                            title: const Text(
+                              '动态设置IP地址',
+                              style: TextStyle(color: Colors.black),
+                              textAlign: TextAlign.center,
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
+                                  child: TextField(
+                                    controller: ipController,
+                                    style:
+                                        const TextStyle(color: Colors.yellow),
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      hintText: '请输入IP地址',
+                                      hintStyle:
+                                          TextStyle(color: Colors.purple),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '当前IP地址为: ${MyWifi.ip}',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  MyWifi.set_Ip(ipController.text);
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text('确定',
+                                    style: TextStyle(color: Colors.black)),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.add,
+                      color: Colors.yellow,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          body: const Center(
+            child: MyHomePage(),
+          ),
         ),
       ),
     );
@@ -87,11 +172,13 @@ class MyHomePage extends StatefulWidget {
 }
 
 //-----------------------------主页面示内容--------------------------------------
-class MyHomePageState extends State<MyHomePage> {
+class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   TtsService mytts = TtsService();
   //final TextEditingController _ipController = TextEditingController();
 
   bool _previousConnectState = false; // 添加变量跟踪之前的连接状态
+
+  final TextEditingController _ipController = TextEditingController();
 
   //暴露出的在其他文件中刷新ui的方法
   void _refreshUI() {
@@ -101,6 +188,7 @@ class MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+
     //传递刷新ui的函数
     MyWifi.refreash = () {
       // 检查连接状态是否发生变化
@@ -124,178 +212,227 @@ class MyHomePageState extends State<MyHomePage> {
     */
   }
 
+  void _showIpDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.yellow,
+          title: const Text(
+            '动态设置IP地址',
+            style: TextStyle(color: Colors.black),
+            textAlign: TextAlign.center,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: TextField(
+                  controller: _ipController,
+                  style: const TextStyle(color: Colors.yellow),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: '请输入IP地址',
+                    hintStyle: TextStyle(color: Colors.purple),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '当前IP地址为: ${MyWifi.ip}',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                MyWifi.set_Ip(_ipController.text);
+                Navigator.of(context).pop();
+              },
+              child: const Text('确定', style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
         body: Column(children: <Widget>[
       Center(
           child: Container(
-              child: Padding(
-                  padding: const EdgeInsets.all(30),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // 添加文本框和按钮
-                      /*
-                      TextField(
-                        controller: _ipController,
-                        decoration: const InputDecoration(
-                          labelText: '输入新的IP地址',
-                          border: OutlineInputBorder(),
-                        ),
+        child: Padding(
+            padding: const EdgeInsets.all(30),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // 添加文本框和按钮
+                /*
+                  TextField(
+                    controller: _ipController,
+                    decoration: const InputDecoration(
+                      labelText: '输入新的IP地址',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  ElevatedButton(
+                    onPressed: () {
+                      String newIp = _ipController.text;
+                      MyWifi.set_Ip(newIp);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('IP地址已更新为: $newIp')),
+                      );
+                      tts.TTS_speakText('IP地址已更新');
+                    },
+                    child: const Text(
+                      '确定',
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 15),
-                      ElevatedButton(
-                        onPressed: () {
-                          String newIp = _ipController.text;
-                          MyWifi.set_Ip(newIp);
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  */
+                Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200], // 容器的背景颜色
+                      borderRadius: BorderRadius.circular(15.0), // 设置圆角半径为 15.0
+                    ),
+                    alignment: Alignment.center,
+                    width: 1000,
+                    height: 50,
+                    child: Text(
+                      '眼镜连接状态：${MyWifi.connect_state ? '已连接' : '未连接'}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18, // 设置文字大小为18
+                        color: Colors.black,
+                      ),
+                    )),
+                const SizedBox(height: 40),
+                SizedBox(
+                    child: MyWifi.list.isEmpty
+                        ? const Image(
+                            image: AssetImage('assets/ic_launcher.png'))
+                        : FadeInImage(
+                            placeholder:
+                                MemoryImage(MyWifi.list), // 使用相同的图像作为占位图像和加载图像
+                            image: MemoryImage(MyWifi.list),
+                          )
+                    //Image.memory(Uint8List.fromList(MyWifi.Data),),
+                    ),
+                const SizedBox(height: 30),
+                /*
+                  SizedBox(
+                    width: 800,
+                    height: 60,
+                    child: ElevatedButton(
+                        onPressed: MyWifi.connect_state
+                            ? null
+                            : () {
+                                AppSettings.openAppSettingsPanel(
+                                    AppSettingsPanelType.wifi);
+                                tts.TTS_speakImpText(
+                                    '请在当前界面内找到名为H O M E的设备并连接');
+                              },
+                        child: const Text("打开wifi设置",
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: Colors.white,
+                            ))),
+                  ),
+                  const SizedBox(height: 15),
+                  */
+                SizedBox(
+                  width: 800,
+                  height: 60,
+                  child: ElevatedButton(
+                      onPressed: () async {
+                        const platform =
+                            MethodChannel('com.example.myeyes/hotspot');
+                        try {
+                          await platform.invokeMethod('openHotspotSettings');
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('IP地址已更新为: $newIp')),
+                            const SnackBar(content: Text('请开启个人热点')),
                           );
-                          tts.TTS_speakText('IP地址已更新');
-                        },
-                        child: const Text(
-                          '确定',
+                          tts.TTS_speakText('请开启个人热点');
+                        } catch (e) {
+                          print('开启热点失败: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('开启热失败，请手动开启')),
+                          );
+                          tts.TTS_speakText('开启热点失败，请手动开启');
+                        }
+                      },
+                      child: const Text("连接热点",
                           style: TextStyle(
                             fontSize: 20,
                             color: Colors.white,
-                          ),
+                          ))),
+                ),
+                const SizedBox(height: 15),
+                SizedBox(
+                  width: 800,
+                  height: 60,
+                  child: ElevatedButton(
+                      onPressed: MyWifi.connect_state
+                          ? null
+                          : () async {
+                              await MyWifi.connectAndCommunicate();
+                            },
+                      child: const Text("open my eyes",
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                          ))),
+                ),
+                const SizedBox(height: 15),
+                SizedBox(
+                  width: 800,
+                  height: 60,
+                  child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const Help()),
+                        );
+                      },
+                      child: const Text(
+                        '帮 助',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: Colors.white,
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      */
-                      Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200], // 容器的背景颜色
-                            borderRadius:
-                                BorderRadius.circular(15.0), // 设置圆角半径为 15.0
-                          ),
-                          alignment: Alignment.center,
-                          width: 1000,
-                          height: 50,
-                          child: Text(
-                            '眼镜连接状态：${MyWifi.connect_state ? '已连接' : '未连接'}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18, // 设置文字大小为18
-                              color: Colors.black,
-                            ),
-                          )),
-                      const SizedBox(height: 40),
-                      SizedBox(
-                          child: MyWifi.list.isEmpty
-                              ? const Image(
-                                  image: AssetImage('assets/ic_launcher.png'))
-                              : FadeInImage(
-                                  placeholder: MemoryImage(
-                                      MyWifi.list), // 使用相同的图像作为占位图像和加载图像
-                                  image: MemoryImage(MyWifi.list),
-                                )
-                          //Image.memory(Uint8List.fromList(MyWifi.Data),),
-                          ),
-                      const SizedBox(height: 30),
-                      /*
-                      SizedBox(
-                        width: 800,
-                        height: 60,
-                        child: ElevatedButton(
-                            onPressed: MyWifi.connect_state
-                                ? null
-                                : () {
-                                    AppSettings.openAppSettingsPanel(
-                                        AppSettingsPanelType.wifi);
-                                    tts.TTS_speakImpText(
-                                        '请在当前界面内找到名为H O M E的设备并连接');
-                                  },
-                            child: const Text("打开wifi设置",
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  color: Colors.white,
-                                ))),
-                      ),
-                      const SizedBox(height: 15),
-                      */
-                      SizedBox(
-                        width: 800,
-                        height: 60,
-                        child: ElevatedButton(
-                            onPressed: () async {
-                              const platform =
-                                  MethodChannel('com.example.myeyes/hotspot');
-                              try {
-                                await platform
-                                    .invokeMethod('openHotspotSettings');
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('请开启个人热点')),
-                                );
-                                tts.TTS_speakText('请开启个人热点');
-                              } catch (e) {
-                                print('开启热点失败: $e');
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('开启热点失败，请手动开启')),
-                                );
-                                tts.TTS_speakText('开启热点失败，请手动开启');
-                              }
-                            },
-                            child: const Text("连接热点",
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  color: Colors.white,
-                                ))),
-                      ),
-                      const SizedBox(height: 15),
-                      SizedBox(
-                        width: 800,
-                        height: 60,
-                        child: ElevatedButton(
-                            onPressed: MyWifi.connect_state
-                                ? null
-                                : () async {
-                                    await MyWifi.connectAndCommunicate();
-                                  },
-                            child: const Text("open my eyes",
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  color: Colors.white,
-                                ))),
-                      ),
-                      const SizedBox(height: 15),
-                      SizedBox(
-                        width: 800,
-                        height: 60,
-                        child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                    builder: (context) => const Help()),
-                              );
-                            },
-                            child: const Text(
-                              '帮 助',
-                              style: TextStyle(
-                                fontSize: 20,
-                                color: Colors.white,
-                              ),
-                            )),
-                      ),
-                      const SizedBox(height: 15),
-                      SizedBox(
-                        width: 800,
-                        height: 60,
-                        child: ElevatedButton(
-                            onPressed: () {
-                              SystemNavigator.pop();
-                            },
-                            child: const Text(
-                              '退 出',
-                              style: TextStyle(
-                                fontSize: 20,
-                                color: Colors.white,
-                              ),
-                            )),
-                      ),
-                    ],
-                  )))),
+                      )),
+                ),
+                const SizedBox(height: 15),
+                SizedBox(
+                  width: 800,
+                  height: 60,
+                  child: ElevatedButton(
+                      onPressed: () {
+                        SystemNavigator.pop();
+                      },
+                      child: const Text(
+                        '退 出',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: Colors.white,
+                        ),
+                      )),
+                ),
+              ],
+            )),
+      )),
     ]));
   }
 }
