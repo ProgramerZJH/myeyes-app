@@ -67,16 +67,22 @@ class WiFiClient {
         // 接收新图片大小信息
         expectedImageSize =
             ByteData.view(data.buffer).getUint32(0, Endian.little);
-        print('Expected image size: $expectedImageSize bytes');
+        print('预期图片大小: $expectedImageSize 字节');
         currentImageData = Uint8List(0);
         isReceivingImage = true;
       } else if (isReceivingImage) {
         // 累积图片数据
         currentImageData = Uint8List.fromList([...currentImageData, ...data]);
 
+        // 添加打印当前接收到的数据信息
+        print('当前接收数据长度: ${currentImageData.length} 字节');
+        print(
+            '接收到的数据内容: ${currentImageData.take(1000).toList()}...'); // 只打印前1000个字节避免输出过多
+
         // 检查是否接收完整
         if (currentImageData.length >= expectedImageSize) {
           isReceivingImage = false;
+          print('图片接收完成！总大小: ${currentImageData.length} 字节');
 
           // 处理完整的图片数据
           if (currentImageData.length == expectedImageSize &&
