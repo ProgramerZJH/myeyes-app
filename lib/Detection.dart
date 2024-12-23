@@ -59,7 +59,11 @@ class MyDetection {
     String detectedClass = '';
     List<dynamic> Temp = [];
     //     宽   横坐标   高   纵坐标    置信度
-    double w = 0, x = 0, h = 0, y = 0, confidence = 0;
+    double w = 0,
+        x = 0,
+        //h = 0,
+        //y = 0,
+        confidence = 0;
 
     //对于每一个被检测到的目标来说：
     for (var element in data) {
@@ -200,5 +204,11 @@ class MyDetection {
     // frameInfo.image.width：获取图像的实际像素宽度
     // 这个宽度用于后续计算物体的相对位置和大小
     return frameInfo.image.width;
+  }
+
+  Future<Uint8List> processImage(Uint8List imageData) async {
+    // 实现目标检测逻辑
+    // 返回处理后的图片数据
+    return imageData;
   }
 }

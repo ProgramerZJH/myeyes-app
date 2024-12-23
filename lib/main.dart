@@ -178,12 +178,12 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
   bool _previousConnectState = false; // 添加变量跟踪之前的连接状态
 
-  final TextEditingController _ipController = TextEditingController();
-
+  /*
   //暴露出的在其他文件中刷新ui的方法
   void _refreshUI() {
     setState(() {});
   }
+  */
 
   @override
   void initState() {
@@ -212,54 +212,15 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     */
   }
 
-  void _showIpDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.yellow,
-          title: const Text(
-            '动态设置IP地址',
-            style: TextStyle(color: Colors.black),
-            textAlign: TextAlign.center,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: TextField(
-                  controller: _ipController,
-                  style: const TextStyle(color: Colors.yellow),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '请输入IP地址',
-                    hintStyle: TextStyle(color: Colors.purple),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '当前IP地址为: ${MyWifi.ip}',
-                style: const TextStyle(color: Colors.grey),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                MyWifi.set_Ip(_ipController.text);
-                Navigator.of(context).pop();
-              },
-              child: const Text('确定', style: TextStyle(color: Colors.black)),
-            ),
-          ],
-        );
-      },
+  Widget buildImageWidget() {
+    final imageData = MyWifi.getCurrentImage();
+    if (imageData.isEmpty) {
+      return Container(); // 显示占位符
+    }
+    return Image.memory(
+      imageData,
+      fit: BoxFit.contain,
+      gaplessPlayback: true, // 防止图片闪烁
     );
   }
 
@@ -274,35 +235,6 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // 添加文本框和按钮
-                /*
-                  TextField(
-                    controller: _ipController,
-                    decoration: const InputDecoration(
-                      labelText: '输入新的IP地址',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  ElevatedButton(
-                    onPressed: () {
-                      String newIp = _ipController.text;
-                      MyWifi.set_Ip(newIp);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('IP地址已更新为: $newIp')),
-                      );
-                      tts.TTS_speakText('IP地址已更新');
-                    },
-                    child: const Text(
-                      '确定',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  */
                 Container(
                     decoration: BoxDecoration(
                       color: Colors.grey[200], // 容器的背景颜色
@@ -320,17 +252,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                       ),
                     )),
                 const SizedBox(height: 40),
-                SizedBox(
-                    child: MyWifi.list.isEmpty
-                        ? const Image(
-                            image: AssetImage('assets/ic_launcher.png'))
-                        : FadeInImage(
-                            placeholder:
-                                MemoryImage(MyWifi.list), // 使用相同的图像作为占位图像和加载图像
-                            image: MemoryImage(MyWifi.list),
-                          )
-                    //Image.memory(Uint8List.fromList(MyWifi.Data),),
-                    ),
+                SizedBox(child: buildImageWidget()),
                 const SizedBox(height: 30),
                 /*
                   SizedBox(
