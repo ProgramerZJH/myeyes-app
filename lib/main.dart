@@ -77,6 +77,53 @@ class _MyAppState extends State<MyApp> {
                 ),
               ),
             ),
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 15),
+              child: Container(
+                height: 35,
+                width: 35,
+                decoration: const BoxDecoration(
+                  color: Colors.yellow,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('通信日志'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              itemCount: MyWifi.logMessages.length,
+                              itemBuilder: (context, index) {
+                                return Text(
+                                  MyWifi.logMessages[index],
+                                  style: const TextStyle(fontSize: 12),
+                                );
+                              },
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('关闭'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.list,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 15),

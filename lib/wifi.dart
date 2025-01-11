@@ -32,6 +32,9 @@ class WiFiClient {
   Socket? socket;
   Function? refreash;
 
+  // 添加日志列表
+  List<String> logMessages = [];
+
   WiFiClient(this.ip, this.port);
 
   Future<void> connectAndCommunicate() async {
@@ -67,7 +70,7 @@ class WiFiClient {
         // 接收新图片大小信息
         expectedImageSize =
             ByteData.view(data.buffer).getUint32(0, Endian.little);
-        print('预期图片大小: $expectedImageSize 字节');
+        addLog('预期图片大小: $expectedImageSize 字节');
         currentImageData = Uint8List(0);
         isReceivingImage = true;
       } else if (isReceivingImage) {
@@ -75,14 +78,14 @@ class WiFiClient {
         currentImageData = Uint8List.fromList([...currentImageData, ...data]);
 
         // 添加打印当前接收到的数据信息
-        print('当前接收数据长度: ${currentImageData.length} 字节');
-        print(
+        addLog('当前接收数据长度: ${currentImageData.length} 字节');
+        addLog(
             '接收到的数据内容: ${currentImageData.take(1000).toList()}...'); // 只打印前1000个字节避免输出过多
 
         // 检查是否接收完整
         if (currentImageData.length >= expectedImageSize) {
           isReceivingImage = false;
-          print('图片接收完成！总大小: ${currentImageData.length} 字节');
+          addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
 
           // 处理完整的图片数据
           if (currentImageData.length == expectedImageSize &&
@@ -133,5 +136,14 @@ class WiFiClient {
   // 获取当前图片数据的方法
   Uint8List getCurrentImage() {
     return processedImageData.isEmpty ? currentImageData : processedImageData;
+  }
+
+  // 添加日志记录方法
+  void addLog(String message) {
+    logMessages.add("[${DateTime.now().toString()}] $message");
+    // 保持最新的100条记录
+    if (logMessages.length > 100) {
+      logMessages.removeAt(0);
+    }
   }
 }
