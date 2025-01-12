@@ -22,6 +22,8 @@ dependencies:
   dio: ^5.4.0
   http: ^1.1.0
   cupertino_icons: ^1.0.2
+  amap_flutter_map: ^3.0.0
+  amap_flutter_location: ^3.0.0
 
 dev_dependencies:
   flutter_test:
