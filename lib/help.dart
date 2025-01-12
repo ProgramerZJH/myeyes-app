@@ -419,7 +419,7 @@ class _HelpState extends State<Help> {
                     ),
                     alignment: Alignment.center,
                     width: 400,
-                    height: 250,
+                    height: 100,
                     child: const Text(
                       '使用说明:xxx',
                       style: TextStyle(
@@ -428,6 +428,29 @@ class _HelpState extends State<Help> {
                         color: Colors.black,
                       ),
                     )),
+
+                SizedBox(
+                  width: 400,
+                  height: 60,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange, // 橙色背景
+                      foregroundColor: Colors.white, // 白色文字
+                    ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/navigation'); // 路由跳转
+                    },
+                    child: const Text(
+                      '导航',
+                      style: TextStyle(
+                        fontSize: 30,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+
                 SizedBox(
                   width: 400,
                   height: 60,

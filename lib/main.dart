@@ -22,6 +22,9 @@ import 'package:flutter/material.dart';
 // 导入帮助页面组件
 import 'help.dart';
 
+// 导入导航页面组件
+import 'navigation.dart';
+
 WiFiClient MyWifi = WiFiClient("192.168.185.33", 8080);
 TtsService tts = TtsService();
 
@@ -206,6 +209,9 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
       ),
+      routes: {
+        '/navigation': (context) => const Navigation(),
+      },
     );
   }
 }
