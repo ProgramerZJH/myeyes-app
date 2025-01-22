@@ -12,6 +12,7 @@ import 'package:myeyes/TTS.dart';
 
 // 导入Flutter基础UI组件
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 
 // 导入应用设置插件，用于打开系统设置面板（如WiFi设置）
 //import 'package:app_settings/app_settings.dart';
@@ -143,7 +144,8 @@ class _MyAppState extends State<MyApp> {
                       showDialog(
                         context: context,
                         builder: (BuildContext context) {
-                          final ipController = TextEditingController();
+                          final ipController =
+                              TextEditingController(text: '192.168.');
                           return AlertDialog(
                             backgroundColor: Colors.yellow,
                             title: const Text(
@@ -183,8 +185,31 @@ class _MyAppState extends State<MyApp> {
                             actions: [
                               TextButton(
                                 onPressed: () {
-                                  MyWifi.set_Ip(ipController.text);
-                                  Navigator.of(context).pop();
+                                  // IP地址格式验证
+                                  final RegExp ipRegex = RegExp(
+                                      r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
+
+                                  if (ipRegex.hasMatch(ipController.text)) {
+                                    MyWifi.set_Ip(ipController.text);
+                                    Navigator.of(context).pop();
+                                  } else {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: const Text('错误'),
+                                          content: const Text('IP地址格式不合法'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(context).pop(),
+                                              child: const Text('确定'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  }
                                 },
                                 child: const Text('确定',
                                     style: TextStyle(color: Colors.black)),
@@ -270,10 +295,29 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     if (imageData.isEmpty) {
       return Container(); // 显示占位符
     }
-    return Image.memory(
-      imageData,
-      fit: BoxFit.contain,
-      gaplessPlayback: true, // 防止图片闪烁
+
+    return FutureBuilder<ui.Image>(
+      future: decodeImageFromList(imageData),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          print('Image decode error: ${snapshot.error}');
+          return Container(); // 解码失败时显示空容器
+        }
+
+        if (!snapshot.hasData) {
+          return const CircularProgressIndicator(); // 加载中显示进度指示器
+        }
+
+        return Image.memory(
+          imageData,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) {
+            print('Image error: $error');
+            return Container(); // 显示错误时的占位符
+          },
+        );
+      },
     );
   }
 
