@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'services/navigation_service.dart';
 
+/// 导航页面
+/// 提供基于高德地图的步行导航功能
+/// 包含地点搜索、路线规划等功能
+
 class Navigation extends StatefulWidget {
   const Navigation({super.key});
 
@@ -12,10 +16,10 @@ class Navigation extends StatefulWidget {
 class _NavigationState extends State<Navigation> {
   final NavigationService _navigationService = NavigationService();
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _searchResults = [];
-  Position? _currentPosition;
-  Map<String, dynamic>? _selectedRoute;
-  bool _isLoading = false;
+  List<dynamic> _searchResults = []; // 搜索结果列表
+  Position? _currentPosition; // 当前位置
+  Map<String, dynamic>? _selectedRoute; // 选中的路线
+  bool _isLoading = false; // 加载状态标志
 
   @override
   void initState() {
@@ -24,6 +28,7 @@ class _NavigationState extends State<Navigation> {
   }
 
   /// 获取当前位置
+  /// 使用Geolocator插件获取设备GPS位置
   Future<void> _getCurrentLocation() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -44,6 +49,8 @@ class _NavigationState extends State<Navigation> {
   }
 
   /// 搜索地点
+  /// [keyword] 搜索关键词
+  /// 使用高德地图POI搜索API
   Future<void> _searchPlace(String keyword) async {
     if (keyword.isEmpty) return;
 
@@ -65,7 +72,9 @@ class _NavigationState extends State<Navigation> {
     }
   }
 
-  /// 规划路线
+  /// 规划步行路线
+  /// [destination] 目的地信息
+  /// 使用高德地图步行路线规划API
   Future<void> _planRoute(Map<String, dynamic> destination) async {
     if (_currentPosition == null) return;
 

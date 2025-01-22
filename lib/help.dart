@@ -13,6 +13,8 @@ import 'package:geolocator/geolocator.dart';
 // 导入天气服务类
 import 'services/weather_service.dart';
 
+/// 帮助页面
+/// 提供天气查询、紧急求助等功能
 class Help extends StatefulWidget {
   const Help({super.key});
 
@@ -22,22 +24,16 @@ class Help extends StatefulWidget {
 
 /// Help页面的状态管理类
 class _HelpState extends State<Help> {
-  // 状态变量：存储当前选择的城市，默认为重庆
-  String selectedCity = '北京';
-  // 天气服务实例，用于获取天气数据
-  final WeatherService _weatherService = WeatherService();
-  // 存储天气预报数据的列表
-  List<Map<String, dynamic>> weatherData = [];
-  // 存储省份和对应城市的Map，格式：{省份: [城市列表]}
-  Map<String, List<String>> cityData = {};
-  // 存储当前选择的省份
-  String selectedProvince = '';
+  String selectedCity = '北京'; // 当前选择的城市
+  final WeatherService _weatherService = WeatherService(); // 天气服务实例
+  List<Map<String, dynamic>> weatherData = []; // 天气预报数据
+  Map<String, List<String>> cityData = {}; // 省份城市数据
+  String selectedProvince = ''; // 当前选择的省份
 
-  // 添加本地缓存变量
-  String? _lastKnownLocation;
-  DateTime? _lastLocationUpdate;
-  final Duration _locationCacheDuration =
-      const Duration(minutes: 5); // 位置信息缓存5分钟
+  // 位置缓存相关
+  String? _lastKnownLocation; // 上次获取的位置
+  DateTime? _lastLocationUpdate; // 上次更新时间
+  final Duration _locationCacheDuration = const Duration(minutes: 5); // 缓存时间
 
   @override
   void initState() {
@@ -54,7 +50,8 @@ class _HelpState extends State<Help> {
     return difference < _locationCacheDuration;
   }
 
-  /// 初始化位置信息（带缓存）
+  /// 初始化位置信息
+  /// 获取当前位置并更新天气信息
   Future<void> _initializeLocation() async {
     try {
       // 检查缓存的位置信息是否有效
@@ -94,7 +91,7 @@ class _HelpState extends State<Help> {
   }
 
   /// 加载城市数据
-  /// 从API获取所有省份和城市的数据，并更新状态
+  /// 从高德地图API获取行政区划数据
   Future<void> _loadCityData() async {
     try {
       // 获取行政区划数据
@@ -166,6 +163,8 @@ class _HelpState extends State<Help> {
     }
   }
 
+  /// 显示紧急援助对话框
+  /// 提供110、120、119紧急电话拨打功能
   void _showEmergencyDialog() {
     showDialog(
       context: context,

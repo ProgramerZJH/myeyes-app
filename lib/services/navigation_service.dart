@@ -1,20 +1,23 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+/// 导航服务类
+/// 封装高德地图API相关功能
+/// 提供地点搜索、路线规划等服务
 class NavigationService {
-  // 使用与天气服务相同的API密钥
-  final String _apiKey = 'd9d5b5221f0dbf8b4e6b09110d91cab0';
+  final String _apiKey = 'd9d5b5221f0dbf8b4e6b09110d91cab0'; // 高德地图API密钥
+  final String _searchUrl =
+      'https://restapi.amap.com/v3/place/text'; // POI搜索API
+  final String _routeUrl =
+      'https://restapi.amap.com/v3/direction/walking'; // 步行路线规划API
 
-  // 高德地图API的基础URL
-  final String _searchUrl = 'https://restapi.amap.com/v3/place/text';
-  final String _routeUrl = 'https://restapi.amap.com/v3/direction/walking';
-
-  // 缓存相关
-  final Map<String, dynamic> _searchCache = {};
-  final Map<String, DateTime> _cacheTimestamp = {};
-  final Duration _cacheDuration = const Duration(minutes: 5);
+  // 缓存相关变量
+  final Map<String, dynamic> _searchCache = {}; // 搜索结果缓存
+  final Map<String, DateTime> _cacheTimestamp = {}; // 缓存时间戳
+  final Duration _cacheDuration = const Duration(minutes: 5); // 缓存有效期
 
   /// 检查缓存是否有效
+  /// [key] 缓存键名
   bool _isCacheValid(String key) {
     if (!_cacheTimestamp.containsKey(key)) return false;
     final difference = DateTime.now().difference(_cacheTimestamp[key]!);
@@ -59,8 +62,8 @@ class NavigationService {
   }
 
   /// 规划步行路线
-  /// [origin] 起点坐标，格式：'longitude,latitude'
-  /// [destination] 终点坐标，格式：'longitude,latitude'
+  /// [origin] 起点坐标
+  /// [destination] 终点坐标
   Future<Map<String, dynamic>> getWalkingRoute(
       String origin, String destination) async {
     try {
