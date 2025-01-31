@@ -24,7 +24,10 @@ dependencies:
   cupertino_icons: ^1.0.2           # iOS风格图标
   amap_flutter_map: ^3.0.0          # 高德地图
   amap_flutter_location: ^3.0.0     # 高德定位
+  amap_flutter_base: ^3.0.0         # 高德基础依赖库
   opencv_dart: ^1.3.3               # OpenCV图像处理
+
+
 
 dev_dependencies:
   flutter_test:

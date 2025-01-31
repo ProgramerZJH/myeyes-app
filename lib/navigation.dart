@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'services/navigation_service.dart';
+import 'package:amap_flutter_map/amap_flutter_map.dart';
+import 'package:amap_flutter_base/amap_flutter_base.dart';
 
 /// 导航页面
 /// 提供基于高德地图的步行导航功能
@@ -20,6 +22,10 @@ class _NavigationState extends State<Navigation> {
   Position? _currentPosition; // 当前位置
   Map<String, dynamic>? _selectedRoute; // 选中的路线
   bool _isLoading = false; // 加载状态标志
+  late AMapController _mapController;
+  final List<Marker> _markers = [];
+  final List<Polyline> _polylines = [];
+  LatLng? _currentLatLng;
 
   @override
   void initState() {
@@ -41,11 +47,24 @@ class _NavigationState extends State<Navigation> {
         Position position = await Geolocator.getCurrentPosition();
         setState(() {
           _currentPosition = position;
+          _currentLatLng = LatLng(position.latitude, position.longitude);
+          _updateCurrentMarker();
         });
       }
     } catch (e) {
       print('获取位置失败: $e');
     }
+  }
+
+  void _updateCurrentMarker() {
+    if (_currentLatLng == null) return;
+
+    _markers.clear();
+    _markers.add(Marker(
+      position: _currentLatLng!,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      infoWindow: const InfoWindow(title: "当前位置"),
+    ));
   }
 
   /// 搜索地点
@@ -108,6 +127,27 @@ class _NavigationState extends State<Navigation> {
       ),
       body: Column(
         children: [
+          // 地图容器
+          Expanded(
+            flex: 2,
+            child: AMapWidget(
+              onMapCreated: (controller) {
+                _mapController = controller;
+                if (_currentLatLng != null) {
+                  _mapController.moveCamera(CameraUpdate.newLatLngZoom(
+                    _currentLatLng!,
+                    16,
+                  ));
+                }
+              },
+              markers: Set<Marker>.of(_markers),
+              polylines: Set<Polyline>.of(_polylines),
+              initialCameraPosition: CameraPosition(
+                target: _currentLatLng ?? const LatLng(39.90960, 116.397228),
+                zoom: 15,
+              ),
+            ),
+          ),
           // 搜索框
           Padding(
             padding: const EdgeInsets.all(8.0),
