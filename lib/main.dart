@@ -14,17 +14,14 @@ import 'package:myeyes/TTS.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 
-// 导入应用设置插件，用于打开系统设置面板（如WiFi设置）
-//import 'package:app_settings/app_settings.dart';
-
-// 导入应用生命周期检测插件，用于监控应用前台/后台状态
-//import 'package:flutter_lifecycle_detector/flutter_lifecycle_detector.dart';
-
 // 导入帮助页面组件
 import 'help.dart';
 
 // 导入导航页面组件
 import 'navigation.dart';
+
+// 导入检测结果类
+import 'Detection.dart';
 
 WiFiClient MyWifi = WiFiClient("192.168.185.33", 8080);
 TtsService tts = TtsService();
@@ -291,33 +288,50 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   }
 
   Widget buildImageWidget() {
-    final imageData = MyWifi.getCurrentImage();
-    if (imageData.isEmpty) {
-      return Container(); // 显示占位符
-    }
+    return ValueListenableBuilder<Uint8List>(
+      valueListenable: MyWifi.imageNotifier,
+      builder: (context, imageData, _) {
+        if (imageData.isEmpty) return Container();
 
-    return FutureBuilder<ui.Image>(
-      future: decodeImageFromList(imageData),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          print('Image decode error: ${snapshot.error}');
-          return Container(); // 解码失败时显示空容器
-        }
+        return InteractiveViewer(
+          maxScale: 3.0,
+          child: Stack(
+            children: [
+              FutureBuilder<ui.Image>(
+                future: decodeImageFromList(imageData),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    print('Image decode error: ${snapshot.error}');
+                    return Container(); // 解码失败时显示空容器
+                  }
 
-        if (!snapshot.hasData) {
-          return const CircularProgressIndicator(); // 加载中显示进度指示器
-        }
+                  if (!snapshot.hasData) {
+                    return const CircularProgressIndicator(); // 加载中显示进度指示器
+                  }
 
-        return Image.memory(
-          imageData,
-          fit: BoxFit.contain,
-          gaplessPlayback: true,
-          errorBuilder: (context, error, stackTrace) {
-            print('Image error: $error');
-            return Container(); // 显示错误时的占位符
-          },
+                  return Image.memory(
+                    imageData,
+                    fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                    errorBuilder: (context, error, stackTrace) {
+                      print('Image error: $error');
+                      return Container(); // 显示错误时的占位符
+                    },
+                  );
+                },
+              ),
+              _buildDetectionOverlay(),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildDetectionOverlay() {
+    final results = MyDetection.getLastResults();
+    return CustomPaint(
+      painter: _DetectionPainter(results),
     );
   }
 
@@ -351,27 +365,6 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 40),
                 SizedBox(child: buildImageWidget()),
                 const SizedBox(height: 30),
-                /*
-                  SizedBox(
-                    width: 800,
-                    height: 60,
-                    child: ElevatedButton(
-                        onPressed: MyWifi.connect_state
-                            ? null
-                            : () {
-                                AppSettings.openAppSettingsPanel(
-                                    AppSettingsPanelType.wifi);
-                                tts.TTS_speakImpText(
-                                    '请在当前界面内找到名为H O M E的设备并连接');
-                              },
-                        child: const Text("打开wifi设置",
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ))),
-                  ),
-                  const SizedBox(height: 15),
-                  */
                 SizedBox(
                   width: 800,
                   height: 60,
@@ -454,4 +447,54 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       )),
     ]));
   }
+}
+
+// 自定义绘制类
+class _DetectionPainter extends CustomPainter {
+  final List<dynamic> results;
+
+  _DetectionPainter(this.results);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.green
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final textStyle = TextStyle(
+      color: Colors.green,
+      fontSize: 14,
+      fontWeight: FontWeight.bold,
+    );
+
+    for (var result in results) {
+      final box = result['box'];
+      final left = box[0] * size.width;
+      final top = box[1] * size.height;
+      final right = box[2] * size.width;
+      final bottom = box[3] * size.height;
+
+      // 绘制边界框
+      canvas.drawRect(
+        Rect.fromLTRB(left, top, right, bottom),
+        paint,
+      );
+
+      // 绘制标签
+      final textSpan = TextSpan(
+        text: result['tag'],
+        style: textStyle,
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(left, top - 20));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
