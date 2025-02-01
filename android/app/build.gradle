@@ -79,14 +79,14 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             signingConfig signingConfigs.debug
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -107,7 +107,8 @@ flutter {
 }
 
 dependencies {
-    implementation 'com.amap.api:location:5.2.0'    // 定位功能
-    implementation 'com.amap.api:3dmap:8.1.0'       // 3D地图
-    implementation 'com.amap.api:search:5.0.0'      // 搜索功能
+
+     implementation 'com.amap.api:location:5.2.0'    
+     implementation 'com.amap.api:3dmap:8.1.0'       
+     implementation 'com.amap.api:search:5.0.0'     
 }

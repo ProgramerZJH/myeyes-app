@@ -1,3 +1,5 @@
+import 'dart:async'; // 添加TimeoutException支持
+import 'package:flutter/services.dart'; // 添加PlatformException支持
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'services/navigation_service.dart';
@@ -30,29 +32,78 @@ class _NavigationState extends State<Navigation> {
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _getCurrentLocation();
+      });
+    }
   }
 
   /// 获取当前位置
   /// 使用Geolocator插件获取设备GPS位置
   Future<void> _getCurrentLocation() async {
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      setState(() => _isLoading = true);
+
+      // 检查服务是否启用
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        // 提示用户打开定位服务
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('请先启用定位服务')));
+        }
+        return;
       }
 
-      if (permission == LocationPermission.whileInUse ||
-          permission == LocationPermission.always) {
-        Position position = await Geolocator.getCurrentPosition();
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.deniedForever) {
+        // 永久拒绝时的处理
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('需要在设置中授予定位权限')));
+        }
+        return;
+      }
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          return; // 用户拒绝权限
+        }
+      }
+
+      // 获取位置时添加try-catch
+      Position position = await Geolocator.getCurrentPosition().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw TimeoutException('定位超时'),
+      );
+
+      if (mounted) {
         setState(() {
           _currentPosition = position;
           _currentLatLng = LatLng(position.latitude, position.longitude);
           _updateCurrentMarker();
+          _isLoading = false;
         });
+      }
+    } on PlatformException catch (e) {
+      print('定位异常: ${e.message}');
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('定位失败: ${e.message}')));
       }
     } catch (e) {
       print('获取位置失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('获取位置失败')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
