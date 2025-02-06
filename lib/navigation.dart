@@ -5,10 +5,13 @@ import 'package:geolocator/geolocator.dart';
 import 'services/navigation_service.dart';
 import 'package:amap_flutter_map/amap_flutter_map.dart';
 import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 导航页面
 /// 提供基于高德地图的步行导航功能
 /// 包含地点搜索、路线规划等功能
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class Navigation extends StatefulWidget {
   const Navigation({super.key});
@@ -32,17 +35,32 @@ class _NavigationState extends State<Navigation> {
   @override
   void initState() {
     super.initState();
-    if (mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        const platform = MethodChannel('com.example.myeyes/amap');
+        await platform.invokeMethod('initAMapSDK');
+
+        // 使用高德定位SDK的合规接口
+        await platform.invokeMethod(
+            'updatePrivacyShow', {'isContains': true, 'isShow': true});
+        await platform.invokeMethod('updatePrivacyAgree', {'isAgree': true});
+
         _getCurrentLocation();
-      });
-    }
+      } on PlatformException catch (e) {
+        print("高德SDK初始化失败: ${e.message}");
+      }
+    });
   }
 
   /// 获取当前位置
   /// 使用Geolocator插件获取设备GPS位置
   Future<void> _getCurrentLocation() async {
     try {
+      // 在定位前检查隐私协议
+      if (!await _checkPrivacyAgreement()) {
+        await _showPrivacyDialog();
+      }
       setState(() => _isLoading = true);
 
       // 检查服务是否启用
@@ -105,6 +123,33 @@ class _NavigationState extends State<Navigation> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<bool> _checkPrivacyAgreement() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('privacyAgreed') ?? false;
+  }
+
+  Future<void> _showPrivacyDialog() async {
+    return showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: Text('隐私政策'),
+                content: SingleChildScrollView(child: Text('...隐私政策内容...')),
+                actions: [
+                  TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text('拒绝')),
+                  ElevatedButton(
+                      onPressed: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('privacyAgreed', true);
+                        Navigator.pop(context);
+                      },
+                      child: Text('同意')),
+                ]));
   }
 
   void _updateCurrentMarker() {

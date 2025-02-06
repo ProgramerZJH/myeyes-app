@@ -50,6 +50,9 @@
         <meta-data
             android:name="com.amap.api.v2.apikey"
             android:value="b1d5458282af400870738a63af553eda" />
+        <meta-data
+            android:name="com.amap.api.v2.privacy"
+            android:value="true"/>
     </application>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />

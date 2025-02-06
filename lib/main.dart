@@ -1,5 +1,5 @@
 // 导入异步编程支持，提供Future、Stream等异步操作功能
-import 'dart:async';
+//import 'dart:async';
 
 // 导入平台服务支持，用于调用原生平台API（如方法通道）
 import 'package:flutter/services.dart';
@@ -29,15 +29,10 @@ import 'navigation.dart';
 WiFiClient MyWifi = WiFiClient("192.168.185.33", 8080);
 TtsService tts = TtsService();
 
-Future<void> main() async {
-  //初始化flutter框架(permission_handler必须)
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  //检查设备连接情况  后  构建主ui
   runApp(const MyApp());
-
-  tts.TTS_speakText('My eyes 助您安全出行');
-  //await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);弃用的WiFi面板
 }
 
 //------------------------------构建主程序----------------------------------------
