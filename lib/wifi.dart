@@ -11,13 +11,17 @@ import 'Detection.dart';
 import 'dart:async';
 
 // 导入类型化数据支持，提供如Uint8List等用于处理二进制数据的类型
-import 'dart:typed_data';
+//import 'dart:typed_data';
 
 // 导入自定义的文字转语音服务，用于语音提示
 import 'package:myeyes/TTS.dart';
 
 // 导入OpenCV图像处理库
 import 'package:opencv_dart/opencv_dart.dart';
+
+// 添加必要的导入
+import 'dart:collection'; // 添加Queue支持
+import 'package:opencv_dart/opencv_dart.dart' as cv; // 明确命名空间
 
 /// WiFi客户端类
 /// 负责与眼镜端建立Socket连接并处理图像数据
@@ -61,6 +65,14 @@ class WiFiClient {
   // 存储日志消息的列表
   List<String> logMessages = [];
 
+  // 添加帧缓冲区
+  final Queue<Uint8List> _frameQueue = Queue(); // 图像帧队列
+  bool _isProcessingQueue = false; // 队列处理状态
+
+  // 添加缺失的成员变量
+  int frame_counter = 0;
+  final ValueNotifier<Uint8List> imageNotifier = ValueNotifier(Uint8List(0));
+
   // 构造函数，初始化IP和端口
   WiFiClient(this.ip, this.port);
 
@@ -101,14 +113,17 @@ class WiFiClient {
   /// [data] 接收到的二进制数据
   Future<void> handleIncomingData(Uint8List data) async {
     try {
-      // 如果收到4字节数据且当前没有在接收图像，则认为是图像大小信息
-      if (data.length == 4 && !isReceivingImage) {
-        expectedImageSize =
-            ByteData.view(data.buffer).getUint32(0, Endian.little);
-        addLog('预期图片大小: $expectedImageSize 字节');
+      // 添加帧头解析逻辑
+      if (data.length == 8 && !isReceivingImage) {
+        final headerData = ByteData.sublistView(data);
+        frame_counter = headerData.getUint32(0, Endian.little);
+        expectedImageSize = headerData.getUint32(4, Endian.little);
+
         currentImageData = Uint8List(0);
         isReceivingImage = true;
+        return;
       }
+
       // 如果正在接收图像数据
       else if (isReceivingImage) {
         // 将新接收的数据追加到当前图像数据中
@@ -117,56 +132,16 @@ class WiFiClient {
 
         // 检查是否接收完整个图像
         if (currentImageData.length >= expectedImageSize) {
-          isReceivingImage = false;
-          addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
-
-          // 如果数据大小正确且未在处理中，则开始处理图像
-          if (currentImageData.length == expectedImageSize &&
-              !isProcessingImage) {
-            isProcessingImage = true;
-
-            try {
-              // 进行目标检测
-              await MyDetection.Det_StartInference(currentImageData);
-
-              // 使用OpenCV处理图像
-              try {
-                // 从内存中解码JPEG数据
-                final mat = imdecode(currentImageData, IMREAD_COLOR);
-
-                // 转换颜色空间（BGR转RGB）
-                final convertedMat = cvtColor(mat, COLOR_BGR2RGB);
-
-                // 将处理后的Mat转换回JPEG格式
-                final (success, encodedBytes) = imencode('.jpg', convertedMat);
-                if (success) {
-                  processedImageData = encodedBytes;
-                } else {
-                  processedImageData = currentImageData;
-                }
-                addLog('图像处理成功');
-                // 释放OpenCV资源
-                convertedMat.dispose();
-                mat.dispose();
-              } catch (e) {
-                addLog('OpenCV处理错误: $e');
-                processedImageData = currentImageData;
-              }
-
-              // 如果存在刷新回调，则刷新UI
-              if (refreash != null) {
-                refreash!();
-              }
-            } catch (e) {
-              addLog('处理图像时发生错误: $e');
-            } finally {
-              isProcessingImage = false;
-            }
-          }
-
-          // 清理数据，准备接收下一张图像
+          // 将完整帧加入队列
+          _frameQueue.add(Uint8List.fromList(currentImageData));
           currentImageData = Uint8List(0);
           expectedImageSize = 0;
+          isReceivingImage = false;
+
+          // 启动队列处理（如果未在处理）
+          if (!_isProcessingQueue) {
+            _processFrameQueue();
+          }
         }
       }
     } catch (e) {
@@ -204,6 +179,83 @@ class WiFiClient {
     // 保持最新的100条记录
     if (logMessages.length > 100) {
       logMessages.removeAt(0);
+    }
+  }
+
+  // 新增队列处理方法
+  void _processFrameQueue() async {
+    _isProcessingQueue = true;
+    while (_frameQueue.isNotEmpty) {
+      final frame = _frameQueue.removeFirst();
+      try {
+        // 并行处理检测和图像处理
+        await Future.wait([
+          MyDetection.Det_StartInference(frame),
+          _processImage(frame),
+        ]);
+
+        if (refreash != null) refreash!();
+      } catch (e) {
+        addLog('帧处理错误: $e');
+      }
+    }
+    _isProcessingQueue = false;
+  }
+
+  // 新增图像处理方法
+  Future<void> _processImage(Uint8List frame) async {
+    try {
+      final mat = imdecode(frame, IMREAD_COLOR);
+      final convertedMat = cvtColor(mat, COLOR_BGR2RGB);
+
+      // 获取检测结果并绘制边界框
+      final detectionResults = MyDetection.getLastResults();
+      _drawBoundingBoxes(convertedMat, detectionResults);
+
+      final (success, encodedBytes) = imencode('.jpg', convertedMat);
+      processedImageData = success ? encodedBytes : frame;
+
+      convertedMat.dispose();
+      mat.dispose();
+
+      // 更新通知器
+      imageNotifier.value = processedImageData;
+    } catch (e) {
+      processedImageData = frame;
+    }
+  }
+
+  // 修改边界框绘制方法
+  void _drawBoundingBoxes(cv.Mat image, List<dynamic> results) {
+    for (var result in results) {
+      final box = result['box'];
+      final left = box[0].toInt();
+      final top = box[1].toInt();
+      final right = box[2].toInt();
+      final bottom = box[3].toInt();
+
+      // 确保坐标有效性
+      final width = (right - left).clamp(1, image.cols);
+      final height = (bottom - top).clamp(1, image.rows);
+
+      cv.rectangle(
+          image,
+          cv.Rect(left.clamp(0, image.cols - 1), top.clamp(0, image.rows - 1),
+              width, height),
+          cv.Scalar(0, 255, 0),
+          thickness: 2);
+
+      cv.putText(
+          image,
+          result['tag'].toString(),
+          cv.Point(
+              left.clamp(0, image.cols - 20), // 留出文本显示空间
+              (top - 5).clamp(20, image.rows) // 防止顶部越界
+              ),
+          cv.FONT_HERSHEY_SIMPLEX,
+          0.5,
+          cv.Scalar(0, 255, 0),
+          thickness: 1);
     }
   }
 }

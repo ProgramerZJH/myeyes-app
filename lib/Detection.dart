@@ -26,32 +26,35 @@ class MyDetection {
   //储存YOLO识别到的物体  ==注意==  格式：[方向(中/左/右)名字(string)  ==>  出现次数(int)]
   static Map<String, int> YOLO_Obj1 = HashMap();
 
+  // 添加结果缓存
+  static List<dynamic> _lastResults = [];
+
   //==========================开始推理===========================================
   static Future<void> Det_StartInference(Uint8List imageBytes) async {
-    List<Map<String, dynamic>> YoloData;
-    //载入模型
-    FlutterVision vision = FlutterVision();
-    await vision.loadYoloModel(
-        labels: 'assets/yolov5.txt', // 标签文件
-        modelPath: 'assets/yolov5.tflite', // 模型文件
-        modelVersion: "yolov5",
-        quantization: false,
-        numThreads: 5,
-        useGpu: true);
+    try {
+      final vision = FlutterVision();
+      await vision.loadYoloModel(
+          labels: 'assets/yolov5.txt', // 标签文件
+          modelPath: 'assets/yolov5.tflite', // 模型文件
+          modelVersion: "yolov5",
+          quantization: false,
+          numThreads: 5,
+          useGpu: true);
 
-    YoloData = await vision.yoloOnImage(
-        bytesList: imageBytes,
-        imageHeight: 416,
-        imageWidth: 416,
-        iouThreshold: 0.8, // 交并比阈值
-        confThreshold: 0.4, // 置信度阈值
-        classThreshold: 0.7); // 类别阈值
+      // 添加GPU加速参数
+      final results = await vision.yoloOnImage(
+          bytesList: imageBytes,
+          imageHeight: 320, // 降低分辨率
+          imageWidth: 320,
+          iouThreshold: 0.8, // 交并比阈值
+          confThreshold: 0.4, // 置信度阈值
+          classThreshold: 0.7); // 类别阈值
 
-    print(YoloData);
-    var wide = await getImageWidth(imageBytes); // 获取图像宽度，用于计算物体的相对位置和大小
-    Dec_YoloFilter(YoloData, wide); // 对检测结果进行过滤和处理，包括位置判断和计数
-    print('YOLO_Obj0------$YOLO_Obj0');
-    print('YOLO_Obj1------$YOLO_Obj1');
+      _lastResults = results;
+      Dec_YoloFilter(results, await getImageWidth(imageBytes));
+    } catch (e) {
+      _lastResults = [];
+    }
   }
 
   //在此进行YOLO算法输出列表的过滤和生效算法
@@ -210,5 +213,10 @@ class MyDetection {
     // 实现目标检测逻辑
     // 返回处理后的图片数据
     return imageData;
+  }
+
+  // 新增结果获取方法
+  static List<dynamic> getLastResults() {
+    return _lastResults;
   }
 }
