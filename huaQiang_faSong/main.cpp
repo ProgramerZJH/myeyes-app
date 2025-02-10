@@ -99,6 +99,7 @@ int main() {
         std::vector<int> params;
         params.push_back(cv::IMWRITE_JPEG_QUALITY);
         params.push_back(95); // 95% quality JPEG
+        cv::resize(img, img, cv::Size(416, 416));  // 统一尺寸
         cv::imencode(".jpg", img, buffer_to_send, params);
 
         // 在发送前添加帧头信息
