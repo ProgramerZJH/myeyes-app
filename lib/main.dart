@@ -1,5 +1,5 @@
 // 导入异步编程支持，提供Future、Stream等异步操作功能
-//import 'dart:async';
+import 'dart:async';
 
 // 导入平台服务支持，用于调用原生平台API（如方法通道）
 import 'package:flutter/services.dart';

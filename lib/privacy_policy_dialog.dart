@@ -10,6 +10,24 @@ class PrivacyPolicyDialog extends StatelessWidget {
     required this.onAgreed,
   }) : super(key: key);
 
+  Future<void> _launchURL(BuildContext context, String urlString) async {
+    try {
+      final Uri url = Uri.parse(urlString);
+      if (!await launcher.launchUrl(
+        url,
+        mode: launcher.LaunchMode.externalApplication,
+      )) {
+        throw Exception('Could not launch $urlString');
+      }
+    } catch (e) {
+      print('Error launching URL: $e');
+      // 可以在这里添加用户提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法打开链接: $urlString')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -30,30 +48,13 @@ class PrivacyPolicyDialog extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 TextButton(
-                  onPressed: () async {
-                    // 这里需要替换成你自己的隐私政策URL
-                    final Uri url = Uri.parse(
-                        'https://github.com/ProgramerZJH/MyEyesPrivacy/blob/main/privacy_policy.md');
-                    if (await launcher.canLaunchUrl(url)) {
-                      await launcher.launchUrl(
-                        url,
-                        mode: launcher.LaunchMode.externalApplication,
-                      );
-                    }
-                  },
+                  onPressed: () => _launchURL(context,
+                      'https://github.com/ProgramerZJH/MyEyesPrivacy/blob/main/privacy_policy.md'),
                   child: const Text('My Eyes 隐私政策'),
                 ),
                 TextButton(
-                  onPressed: () async {
-                    final Uri url =
-                        Uri.parse('https://lbs.amap.com/pages/privacy/');
-                    if (await launcher.canLaunchUrl(url)) {
-                      await launcher.launchUrl(
-                        url,
-                        mode: launcher.LaunchMode.externalApplication,
-                      );
-                    }
-                  },
+                  onPressed: () => _launchURL(
+                      context, 'https://lbs.amap.com/pages/privacy/'),
                   child: const Text('高德隐私政策'),
                 ),
               ],

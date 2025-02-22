@@ -63,6 +63,10 @@ class WiFiClient {
       StreamController<Uint8List>.broadcast();
   Stream<Uint8List> get imageStream => imageStreamController.stream;
 
+  // 添加超时控制
+  final Duration _imageTimeout = const Duration(seconds: 1);
+  DateTime? _lastImageUpdate;
+
   // 构造函数，初始化IP和端口
   WiFiClient(this.ip, this.port);
 
@@ -190,5 +194,46 @@ class WiFiClient {
   void dispose() {
     imageStreamController.close();
     socket?.close();
+  }
+
+  // 修改图像流处理
+  void handleImageData(Uint8List data) {
+    try {
+      _lastImageUpdate = DateTime.now();
+      imageStreamController.add(data);
+    } catch (e) {
+      print('图像处理错误: $e');
+    }
+  }
+
+  // 添加图像监控机制
+  void _startImageMonitor() {
+    Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (_lastImageUpdate != null) {
+        final difference = DateTime.now().difference(_lastImageUpdate!);
+        if (difference > _imageTimeout) {
+          print('图像更新超时，尝试重新连接...');
+          reconnect();
+        }
+      }
+    });
+  }
+
+  // 修改连接方法
+  Future<void> connect() async {
+    try {
+      socket = await Socket.connect(ip, port);
+      _startImageMonitor();
+      // ... 其他连接代码 ...
+    } catch (e) {
+      print('连接错误: $e');
+    }
+  }
+
+  // 添加重连方法
+  Future<void> reconnect() async {
+    socket?.close();
+    socket = null;
+    await connect();
   }
 }
