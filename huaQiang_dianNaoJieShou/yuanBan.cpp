@@ -62,7 +62,7 @@ int main() {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
 
-    if (inet_pton(AF_INET, "192.168.185.33", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, "192.168.1.33", &serv_addr.sin_addr) <= 0) {
         handle_error("Connection failed", sock);
     }
 
@@ -75,9 +75,6 @@ int main() {
     // OpenCV窗口
     cv::namedWindow("Received Image", cv::WINDOW_AUTOSIZE);
 
-    // 在发送循环前添加帧同步机制
-    uint32_t frame_counter = 0;  // 添加帧计数器
-
     while (true) {
         uint32_t image_size = 0;
         std::vector<uchar> buffer;
@@ -85,6 +82,8 @@ int main() {
         // 重新尝试接收图像数据，直到成功
         while (!receive_data(sock, image_size, buffer)) {
             std::cerr << "Error receiving image data. Retrying..." << std::endl;
+            // 如果失败，可以选择暂停一段时间再重试
+            // std::this_thread::sleep_for(std::chrono::milliseconds(500));  // 可选
         }
 
         // 将接收到的字节数据解码为图像
@@ -92,41 +91,6 @@ int main() {
         if (img.empty()) {
             std::cerr << "Failed to decode the image." << std::endl;
             continue;
-        }
-
-        // 在发送图像前进行JPEG编码
-        std::vector<uchar> buffer_to_send;
-        std::vector<int> params;
-        params.push_back(cv::IMWRITE_JPEG_QUALITY);
-        params.push_back(95); // 95% quality JPEG
-        cv::resize(img, img, cv::Size(416, 416));  // 统一尺寸
-        cv::imencode(".jpg", img, buffer_to_send, params);
-
-        // 在发送前添加帧头信息
-        struct FrameHeader {
-            uint32_t frame_number;
-            uint32_t data_size;
-        } header;
-
-        header.frame_number = frame_counter++;
-        header.data_size = buffer_to_send.size();
-
-        // 先发送帧头
-        if (send(sock, reinterpret_cast<char*>(&header), sizeof(header), 0) <= 0) {
-            std::cerr << "Failed to send frame header." << std::endl;
-            continue;
-        }
-
-        // 再发送图像数据（分块发送）
-        size_t sent_bytes = 0;
-        while (sent_bytes < buffer_to_send.size()) {
-            size_t chunk_size = std::min(buffer_to_send.size() - sent_bytes, (size_t)4096);
-            ssize_t bytes = send(sock, reinterpret_cast<char*>(buffer_to_send.data()) + sent_bytes, chunk_size, 0);
-            if (bytes <= 0) {
-                std::cerr << "Failed to send image chunk." << std::endl;
-                break;
-            }
-            sent_bytes += bytes;
         }
 
         // 显示图像

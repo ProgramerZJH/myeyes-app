@@ -10,18 +10,11 @@ import 'Detection.dart';
 // 导入异步编程支持，提供Future、Stream等异步操作功能
 import 'dart:async';
 
-// 导入类型化数据支持，提供如Uint8List等用于处理二进制数据的类型
-//import 'dart:typed_data';
-
 // 导入自定义的文字转语音服务，用于语音提示
 import 'package:myeyes/TTS.dart';
 
 // 导入OpenCV图像处理库
 import 'package:opencv_dart/opencv_dart.dart';
-
-// 添加必要的导入
-import 'dart:collection'; // 添加Queue支持
-import 'package:opencv_dart/opencv_dart.dart' as cv; // 明确命名空间
 
 /// WiFi客户端类
 /// 负责与眼镜端建立Socket连接并处理图像数据
@@ -65,13 +58,10 @@ class WiFiClient {
   // 存储日志消息的列表
   List<String> logMessages = [];
 
-  // 添加帧缓冲区
-  final Queue<Uint8List> _frameQueue = Queue(); // 图像帧队列
-  bool _isProcessingQueue = false; // 队列处理状态
-
-  // 添加缺失的成员变量
-  int frame_counter = 0;
-  final ValueNotifier<Uint8List> imageNotifier = ValueNotifier(Uint8List(0));
+  // 添加图像显示控制器
+  final StreamController<Uint8List> imageStreamController =
+      StreamController<Uint8List>.broadcast();
+  Stream<Uint8List> get imageStream => imageStreamController.stream;
 
   // 构造函数，初始化IP和端口
   WiFiClient(this.ip, this.port);
@@ -113,42 +103,56 @@ class WiFiClient {
   /// [data] 接收到的二进制数据
   Future<void> handleIncomingData(Uint8List data) async {
     try {
-      // 添加帧头解析逻辑
-      if (data.length == 8 && !isReceivingImage) {
-        final headerData = ByteData.sublistView(data);
-        frame_counter = headerData.getUint32(0, Endian.little);
-        expectedImageSize = headerData.getUint32(4, Endian.little);
-
+      if (data.length == 4 && !isReceivingImage) {
+        expectedImageSize =
+            ByteData.view(data.buffer).getUint32(0, Endian.little);
+        addLog('预期图片大小: $expectedImageSize 字节');
         currentImageData = Uint8List(0);
         isReceivingImage = true;
-        return;
       }
-
       // 如果正在接收图像数据
       else if (isReceivingImage) {
         // 将新接收的数据追加到当前图像数据中
         currentImageData = Uint8List.fromList([...currentImageData, ...data]);
         addLog('当前接收数据长度: ${currentImageData.length} 字节');
 
-        // 检查是否接收完整个图像
         if (currentImageData.length >= expectedImageSize) {
-          // 将完整帧加入队列
-          _frameQueue.add(Uint8List.fromList(currentImageData));
-          currentImageData = Uint8List(0);
-          expectedImageSize = 0;
           isReceivingImage = false;
 
-          // 启动队列处理（如果未在处理）
-          if (!_isProcessingQueue) {
-            _processFrameQueue();
+          if (currentImageData.length == expectedImageSize) {
+            try {
+              // 解码图像
+              final mat = imdecode(currentImageData, IMREAD_COLOR);
+              // BGR 转 RGB
+              final rgbMat = cvtColor(mat, COLOR_BGR2RGB);
+              // 编码为 JPEG
+              final (success, processedImage) = imencode('.jpg', rgbMat);
+
+              if (success) {
+                // 通过 Stream 发送图像数据
+                imageStreamController.add(processedImage);
+              }
+
+              // 释放资源
+              mat.dispose();
+              rgbMat.dispose();
+
+              // 异步执行目标检测
+              compute(MyDetection.Det_StartInference, currentImageData);
+            } catch (e) {
+              addLog('图像处理错误: $e');
+            }
           }
+
+          // 清理数据，准备接收下一张图像
+          currentImageData = Uint8List(0);
+          expectedImageSize = 0;
         }
       }
     } catch (e) {
       // 发生错误时重置所有状态
       addLog('数据处理错误: $e');
       isReceivingImage = false;
-      isProcessingImage = false;
       currentImageData = Uint8List(0);
       expectedImageSize = 0;
     }
@@ -182,80 +186,9 @@ class WiFiClient {
     }
   }
 
-  // 新增队列处理方法
-  void _processFrameQueue() async {
-    _isProcessingQueue = true;
-    while (_frameQueue.isNotEmpty) {
-      final frame = _frameQueue.removeFirst();
-      try {
-        // 并行处理检测和图像处理
-        await Future.wait([
-          MyDetection.Det_StartInference(frame),
-          _processImage(frame),
-        ]);
-
-        if (refreash != null) refreash!();
-      } catch (e) {
-        addLog('帧处理错误: $e');
-      }
-    }
-    _isProcessingQueue = false;
-  }
-
-  // 新增图像处理方法
-  Future<void> _processImage(Uint8List frame) async {
-    try {
-      final mat = imdecode(frame, IMREAD_COLOR);
-      final convertedMat = cvtColor(mat, COLOR_BGR2RGB);
-
-      // 获取检测结果并绘制边界框
-      final detectionResults = MyDetection.getLastResults();
-      _drawBoundingBoxes(convertedMat, detectionResults);
-
-      final (success, encodedBytes) = imencode('.jpg', convertedMat);
-      processedImageData = success ? encodedBytes : frame;
-
-      convertedMat.dispose();
-      mat.dispose();
-
-      // 更新通知器
-      imageNotifier.value = processedImageData;
-    } catch (e) {
-      processedImageData = frame;
-    }
-  }
-
-  // 修改边界框绘制方法
-  void _drawBoundingBoxes(cv.Mat image, List<dynamic> results) {
-    for (var result in results) {
-      final box = result['box'];
-      final left = box[0].toInt();
-      final top = box[1].toInt();
-      final right = box[2].toInt();
-      final bottom = box[3].toInt();
-
-      // 确保坐标有效性
-      final width = (right - left).clamp(1, image.cols);
-      final height = (bottom - top).clamp(1, image.rows);
-
-      cv.rectangle(
-          image,
-          cv.Rect(left.clamp(0, image.cols - 1), top.clamp(0, image.rows - 1),
-              width, height),
-          cv.Scalar(0, 255, 0),
-          thickness: 2);
-
-      cv.putText(
-          image,
-          result['tag'].toString(),
-          cv.Point(
-              left.clamp(0, image.cols - 20), // 留出文本显示空间
-              (top - 5).clamp(20, image.rows) // 防止顶部越界
-              ),
-          cv.FONT_HERSHEY_SIMPLEX,
-          0.5,
-          cv.Scalar(0, 255, 0),
-          thickness: 1);
-    }
+  // 在不需要时释放资源
+  void dispose() {
+    imageStreamController.close();
+    socket?.close();
   }
 }

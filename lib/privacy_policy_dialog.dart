@@ -1,53 +1,74 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher.dart' as launcher;
+//import 'package:myeyes/amap_initializer.dart';
 
 class PrivacyPolicyDialog extends StatelessWidget {
   final Function(bool) onAgreed;
 
-  const PrivacyPolicyDialog({super.key, required this.onAgreed});
+  const PrivacyPolicyDialog({
+    Key? key,
+    required this.onAgreed,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('隐私政策协议'),
+      title: const Text('隐私政策'),
       content: SingleChildScrollView(
         child: Column(
           children: [
             const Text(
-              '请您务必审慎阅读并充分理解《隐私权政策》的全部内容，',
-              style: TextStyle(fontSize: 16),
-            ),
-            TextButton(
-              onPressed: () => launchUrl(
-                Uri.parse('https://lbs.amap.com/pages/privacy/'),
-              ),
-              child: const Text('查看完整隐私政策'),
-            ),
-            const Text(
-              '我们使用了高德地图SDK提供服务，需要您同意以下内容：\n'
-              '1. 允许应用获取位置信息用于导航服务\n'
-              '2. 允许应用收集设备信息用于地图渲染优化\n'
-              '3. 同意高德地图开放平台隐私政策（点击查看完整政策）\n'
-              '如您不同意，将无法使用导航相关服务',
+              '本应用使用高德开放平台位置服务SDK，需要收集：\n'
+              '1. 位置信息：用于导航和定位服务\n'
+              '2. 设备信息：用于地图服务性能优化\n'
+              '3. 网络状态：用于在线地图和路径规划\n\n'
+              '您可以查看完整的隐私政策和高德地图隐私权政策了解详情。\n\n'
+              '继续使用表示您同意我们的隐私政策。',
               style: TextStyle(fontSize: 14),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    // 这里需要替换成你自己的隐私政策URL
+                    final Uri url = Uri.parse(
+                        'https://github.com/ProgramerZJH/MyEyesPrivacy/blob/main/privacy_policy.md');
+                    if (await launcher.canLaunchUrl(url)) {
+                      await launcher.launchUrl(
+                        url,
+                        mode: launcher.LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+                  child: const Text('My Eyes 隐私政策'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final Uri url =
+                        Uri.parse('https://lbs.amap.com/pages/privacy/');
+                    if (await launcher.canLaunchUrl(url)) {
+                      await launcher.launchUrl(
+                        url,
+                        mode: launcher.LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+                  child: const Text('高德隐私政策'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
+      actions: <Widget>[
         TextButton(
-          onPressed: () {
-            onAgreed(false);
-            Navigator.of(context).pop();
-          },
-          child: const Text('暂不同意'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('同意'),
         ),
-        ElevatedButton(
-          onPressed: () {
-            onAgreed(true);
-            Navigator.of(context).pop();
-          },
-          child: const Text('同意并继续'),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('不同意'),
         ),
       ],
     );

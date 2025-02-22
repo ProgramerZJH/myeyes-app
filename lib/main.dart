@@ -12,7 +12,9 @@ import 'package:myeyes/TTS.dart';
 
 // 导入Flutter基础UI组件
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
+
+// 导入隐私政策对话框组件
+import 'package:myeyes/privacy_policy_dialog.dart';
 
 // 导入应用设置插件，用于打开系统设置面板（如WiFi设置）
 //import 'package:app_settings/app_settings.dart';
@@ -26,13 +28,20 @@ import 'help.dart';
 // 导入导航页面组件
 import 'navigation.dart';
 
+import 'package:myeyes/amap_initializer.dart';
+
 WiFiClient MyWifi = WiFiClient("192.168.185.33", 8080);
 TtsService tts = TtsService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const MyApp());
+  // 使用 MaterialApp 包装
+  runApp(MaterialApp(
+    home: const MyApp(),
+    debugShowCheckedModeBanner: false,
+  ));
+  tts.TTS_speakText('My eyes 助您安全出行');
 }
 
 //------------------------------构建主程序----------------------------------------
@@ -44,6 +53,40 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  bool _hasShownPrivacyDialog = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 延迟显示隐私政策弹窗
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showPrivacyDialogIfNeeded();
+    });
+  }
+
+  Future<void> _showPrivacyDialogIfNeeded() async {
+    if (!_hasShownPrivacyDialog) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PrivacyPolicyDialog(
+          onAgreed: (agreed) async {
+            if (agreed) {
+              // 用户同意后初始化地图
+              bool mapInitialized = await AMapInitializer.init();
+              if (!mapInitialized) {
+                print('高德地图初始化失败');
+              }
+            }
+            setState(() {
+              _hasShownPrivacyDialog = true;
+            });
+          },
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -286,32 +329,16 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   }
 
   Widget buildImageWidget() {
-    final imageData = MyWifi.getCurrentImage();
-    if (imageData.isEmpty) {
-      return Container(); // 显示占位符
-    }
-
-    return FutureBuilder<ui.Image>(
-      future: decodeImageFromList(imageData),
+    return StreamBuilder<Uint8List>(
+      stream: MyWifi.imageStream,
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          print('Image decode error: ${snapshot.error}');
-          return Container(); // 解码失败时显示空容器
+        if (snapshot.hasData) {
+          return Image.memory(
+            snapshot.data!,
+            gaplessPlayback: true, // 防止图像闪烁
+          );
         }
-
-        if (!snapshot.hasData) {
-          return const CircularProgressIndicator(); // 加载中显示进度指示器
-        }
-
-        return Image.memory(
-          imageData,
-          fit: BoxFit.contain,
-          gaplessPlayback: true,
-          errorBuilder: (context, error, stackTrace) {
-            print('Image error: $error');
-            return Container(); // 显示错误时的占位符
-          },
-        );
+        return Container(); // 或其他占位组件
       },
     );
   }

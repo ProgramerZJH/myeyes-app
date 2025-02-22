@@ -26,64 +26,32 @@ class MyDetection {
   //储存YOLO识别到的物体  ==注意==  格式：[方向(中/左/右)名字(string)  ==>  出现次数(int)]
   static Map<String, int> YOLO_Obj1 = HashMap();
 
-  // 添加静态变量存储最近结果
-  static List<dynamic> _lastResults = [];
-
-  // 添加获取结果方法
-  static List<dynamic> getLastResults() {
-    return _lastResults;
-  }
-
-  // 在检测完成后更新结果
-  static void updateResults(List<dynamic> results) {
-    _lastResults = results;
-  }
-
-  static FlutterVision? _vision;
-  static bool _isModelLoaded = false;
-
-  // 初始化并加载模型
-  static Future<void> initModel() async {
-    if (_vision == null) {
-      _vision = FlutterVision();
-      try {
-        await _vision!.loadYoloModel(
-            labels: 'assets/yolov5.txt',
-            modelPath: 'assets/yolov5.tflite',
-            modelVersion: "yolov5",
-            quantization: false,
-            numThreads: 5,
-            useGpu: true);
-        _isModelLoaded = true;
-      } catch (e) {
-        print('模型加载失败: $e');
-        ttsService.TTS_speakImpText('模型加载失败');
-      }
-    }
-  }
-
   //==========================开始推理===========================================
   static Future<void> Det_StartInference(Uint8List imageBytes) async {
-    if (!_isModelLoaded) {
-      await initModel();
-    }
+    List<Map<String, dynamic>> YoloData;
+    //载入模型
+    FlutterVision vision = FlutterVision();
+    await vision.loadYoloModel(
+        labels: 'assets/yolov5.txt', // 标签文件
+        modelPath: 'assets/yolov5.tflite', // 模型文件
+        modelVersion: "yolov5",
+        quantization: false,
+        numThreads: 5,
+        useGpu: true);
 
-    try {
-      List<Map<String, dynamic>> YoloData = await _vision!.yoloOnImage(
-          bytesList: imageBytes,
-          imageHeight: 416,
-          imageWidth: 416,
-          iouThreshold: 0.8,
-          confThreshold: 0.4,
-          classThreshold: 0.7);
+    YoloData = await vision.yoloOnImage(
+        bytesList: imageBytes,
+        imageHeight: 416,
+        imageWidth: 416,
+        iouThreshold: 0.8, // 交并比阈值
+        confThreshold: 0.4, // 置信度阈值
+        classThreshold: 0.7); // 类别阈值
 
-      print(YoloData);
-      var wide = await getImageWidth(imageBytes);
-      Dec_YoloFilter(YoloData, wide);
-      updateResults(YoloData);
-    } catch (e) {
-      print('推理失败: $e');
-    }
+    print(YoloData);
+    var wide = await getImageWidth(imageBytes); // 获取图像宽度，用于计算物体的相对位置和大小
+    Dec_YoloFilter(YoloData, wide); // 对检测结果进行过滤和处理，包括位置判断和计数
+    print('YOLO_Obj0------$YOLO_Obj0');
+    print('YOLO_Obj1------$YOLO_Obj1');
   }
 
   //在此进行YOLO算法输出列表的过滤和生效算法
@@ -242,11 +210,5 @@ class MyDetection {
     // 实现目标检测逻辑
     // 返回处理后的图片数据
     return imageData;
-  }
-
-  // 释放资源
-  static void dispose() {
-    _vision = null;
-    _isModelLoaded = false;
   }
 }
