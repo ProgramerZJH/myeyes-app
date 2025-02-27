@@ -13,6 +13,9 @@ import 'package:geolocator/geolocator.dart';
 // 导入天气服务类
 import 'services/weather_service.dart';
 
+// 导入新的页面
+import 'instructions_privacy.dart';
+
 /// 帮助页面
 /// 提供天气查询、紧急求助等功能
 class Help extends StatefulWidget {
@@ -411,22 +414,33 @@ class _HelpState extends State<Help> {
           child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Container(
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const InstructionsPrivacyPage(),
+                      ),
+                    );
+                  },
+                  child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey[200], // 容器的背景颜色
-                      borderRadius: BorderRadius.circular(15.0), // 设置圆角半径为 15.0
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(15.0),
                     ),
                     alignment: Alignment.center,
                     width: 400,
                     height: 100,
                     child: const Text(
-                      '使用说明:xxx',
+                      '点击查看使用说明及隐私合规',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15, // 设置字大小为18
+                        fontSize: 15,
                         color: Colors.black,
                       ),
-                    )),
+                    ),
+                  ),
+                ),
 
                 SizedBox(
                   width: 400,

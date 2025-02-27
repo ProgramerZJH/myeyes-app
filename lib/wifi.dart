@@ -122,29 +122,52 @@ class WiFiClient {
 
         if (currentImageData.length >= expectedImageSize) {
           isReceivingImage = false;
+          addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
 
-          if (currentImageData.length == expectedImageSize) {
+          // 如果数据大小正确且未在处理中，则开始处理图像
+          if (currentImageData.length == expectedImageSize &&
+              !isProcessingImage) {
+            isProcessingImage = true;
+
             try {
-              // 解码图像
-              final mat = imdecode(currentImageData, IMREAD_COLOR);
-              // BGR 转 RGB
-              final rgbMat = cvtColor(mat, COLOR_BGR2RGB);
-              // 编码为 JPEG
-              final (success, processedImage) = imencode('.jpg', rgbMat);
+              // 进行目标检测
+              await MyDetection.Det_StartInference(currentImageData);
 
-              if (success) {
-                // 通过 Stream 发送图像数据
-                imageStreamController.add(processedImage);
+              // 使用OpenCV处理图像
+              try {
+                // 从内存中解码JPEG数据
+                final mat = imdecode(currentImageData, IMREAD_COLOR);
+
+                // 转换颜色空间（BGR转RGB）
+                final convertedMat = cvtColor(mat, COLOR_BGR2RGB);
+
+                // 将处理后的Mat转换回JPEG格式
+                final (success, encodedBytes) = imencode('.jpg', convertedMat);
+                if (success) {
+                  // 通过 Stream 发送图像数据
+                  imageStreamController.add(encodedBytes);
+                  processedImageData = encodedBytes;
+                  addLog('图像处理成功');
+                } else {
+                  processedImageData = currentImageData;
+                }
+
+                // 释放OpenCV资源
+                convertedMat.dispose();
+                mat.dispose();
+              } catch (e) {
+                addLog('OpenCV处理错误: $e');
+                processedImageData = currentImageData;
               }
 
-              // 释放资源
-              mat.dispose();
-              rgbMat.dispose();
-
-              // 异步执行目标检测
-              compute(MyDetection.Det_StartInference, currentImageData);
+              // 如果存在刷新回调，则刷新UI
+              if (refreash != null) {
+                refreash!();
+              }
             } catch (e) {
-              addLog('图像处理错误: $e');
+              addLog('处理图像时发生错误: $e');
+            } finally {
+              isProcessingImage = false;
             }
           }
 
@@ -157,6 +180,7 @@ class WiFiClient {
       // 发生错误时重置所有状态
       addLog('数据处理错误: $e');
       isReceivingImage = false;
+      isProcessingImage = false;
       currentImageData = Uint8List(0);
       expectedImageSize = 0;
     }
