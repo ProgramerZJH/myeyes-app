@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 /// 封装高德地图API相关功能
 /// 提供地点搜索、路线规划等服务
 class NavigationService {
-  final String _apiKey = 'b1d5458282af400870738a63af553eda'; // 高德地图API密钥
+  final String _apiKey = 'd9d5b5221f0dbf8b4e6b09110d91cab0'; // 高德地图web服务密钥
   final String _searchUrl =
       'https://restapi.amap.com/v3/place/text'; // POI搜索API
   final String _routeUrl =

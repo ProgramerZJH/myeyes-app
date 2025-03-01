@@ -23,7 +23,9 @@ class PrivacyPolicyDialog extends StatelessWidget {
       print('Error launching URL: $e');
       // 可以在这里添加用户提示
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('无法打开链接: $urlString')),
+        SnackBar(
+            content: Text('无法打开链接: $urlString',
+                style: TextStyle(color: Colors.white))),
       );
     }
   }
@@ -31,7 +33,7 @@ class PrivacyPolicyDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('隐私政策'),
+      title: const Text('隐私政策', style: TextStyle(color: Colors.white)),
       content: SingleChildScrollView(
         child: Column(
           children: [
@@ -42,7 +44,7 @@ class PrivacyPolicyDialog extends StatelessWidget {
               '3. 网络状态：用于在线地图和路径规划\n\n'
               '您可以查看完整的隐私政策和高德地图隐私权政策了解详情。\n\n'
               '继续使用表示您同意我们的隐私政策。',
-              style: TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: 14, color: Colors.white),
             ),
             Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -50,12 +52,14 @@ class PrivacyPolicyDialog extends StatelessWidget {
                 TextButton(
                   onPressed: () => _launchURL(context,
                       'https://github.com/ProgramerZJH/MyEyesPrivacy/blob/main/privacy_policy.md'),
-                  child: const Text('My Eyes 隐私政策'),
+                  child: const Text('My Eyes 隐私政策',
+                      style: TextStyle(color: Colors.white)),
                 ),
                 TextButton(
                   onPressed: () => _launchURL(
                       context, 'https://lbs.amap.com/pages/privacy/'),
-                  child: const Text('高德隐私政策'),
+                  child: const Text('高德隐私政策',
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -65,11 +69,11 @@ class PrivacyPolicyDialog extends StatelessWidget {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('同意'),
+          child: const Text('同意', style: TextStyle(color: Colors.white)),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('不同意'),
+          child: const Text('不同意', style: TextStyle(color: Colors.white)),
         ),
       ],
     );

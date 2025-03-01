@@ -44,7 +44,7 @@ void main() async {
     home: const MyApp(),
     debugShowCheckedModeBanner: false,
   ));
-  tts.TTS_speakText('My eyes 助您安全出行');
+  tts.TTS_speakText('My eyes 伴您安全出行');
 }
 
 //------------------------------构建主程序----------------------------------------
@@ -90,7 +90,7 @@ class _MyAppState extends State<MyApp> {
             backgroundColor: Colors.black,
             title: const Center(
               child: Text(
-                '视途无忧',
+                '听见视界',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

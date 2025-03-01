@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'services/navigation_service.dart';
 import 'package:amap_map/amap_map.dart';
 import 'package:x_amap_base/x_amap_base.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+//import 'package:shared_preferences/shared_preferences.dart';
 import 'package:myeyes/privacy_policy_dialog.dart'; // 添加这行
 import 'dart:math' show min, max;
 
@@ -45,29 +45,22 @@ class _NavigationState extends State<Navigation> {
 
   Future<void> _initPrivacy() async {
     try {
-      // 2. 显示隐私弹窗
-      if (!await _checkPrivacyAgreement()) {
-        final agreed = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => PrivacyPolicyDialog(
-            onAgreed: (agreed) {
-              Navigator.pop(context, agreed);
-            },
-          ),
-        );
+      // 每次都显示隐私弹窗
+      final agreed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PrivacyPolicyDialog(
+          onAgreed: (agreed) {
+            Navigator.pop(context, agreed);
+          },
+        ),
+      );
 
-        if (agreed == true) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('privacyAgreed', true);
-          // 3. 初始化地图
-          await _initMap();
-        } else {
-          Navigator.pop(context);
-        }
-      } else {
-        // 已同意过，直接初始化地图
+      if (agreed == true) {
+        // 3. 初始化地图
         await _initMap();
+      } else {
+        Navigator.pop(context);
       }
     } catch (e) {
       print('隐私合规初始化失败: $e');
@@ -126,21 +119,12 @@ class _NavigationState extends State<Navigation> {
     }
   }
 
-  Future<bool> _checkPrivacyAgreement() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('privacyAgreed') ?? false;
-  }
+  /*Future<bool> _checkPrivacyAgreement() async {
+    // 移除缓存检查，每次都显示隐私弹窗
+    return false;
+  }*/
 
   void _updateCurrentMarker() {
-    // if (_currentLatLng == null) return;
-
-    // _markers.clear();
-    // _markers.add(Marker(
-    //   position: _currentLatLng!,
-    //   icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-    //   infoWindow: const InfoWindow(title: "当前位置"),
-    // ));
-
     // 使用 _mapController 移动相机
     _mapController.moveCamera(
       CameraUpdate.newLatLngZoom(_currentLatLng!, 15),
