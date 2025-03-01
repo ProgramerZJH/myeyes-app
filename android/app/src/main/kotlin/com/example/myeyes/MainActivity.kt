@@ -14,10 +14,15 @@ import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.content.ComponentName
+import android.os.Bundle
 
 class MainActivity: FlutterActivity() {
     private lateinit var wifiManager: WifiManager
     private val PERMISSION_REQUEST_CODE = 123
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+    }
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

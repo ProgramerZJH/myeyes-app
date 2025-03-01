@@ -1,11 +1,13 @@
 import 'dart:async'; // 添加TimeoutException支持
-import 'package:flutter/services.dart'; // 添加PlatformException支持
+//import 'package:flutter/services.dart'; // 添加PlatformException支持
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'services/navigation_service.dart';
-import 'package:amap_flutter_map/amap_flutter_map.dart';
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:amap_map/amap_map.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:myeyes/privacy_policy_dialog.dart'; // 添加这行
+import 'dart:math' show min, max;
 
 /// 导航页面
 /// 提供基于高德地图的步行导航功能
@@ -35,38 +37,61 @@ class _NavigationState extends State<Navigation> {
   @override
   void initState() {
     super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        const platform = MethodChannel('com.example.myeyes/amap');
-        await platform.invokeMethod('initAMapSDK');
-
-        // 使用高德定位SDK的合规接口
-        await platform.invokeMethod(
-            'updatePrivacyShow', {'isContains': true, 'isShow': true});
-        await platform.invokeMethod('updatePrivacyAgree', {'isAgree': true});
-
-        _getCurrentLocation();
-      } on PlatformException catch (e) {
-        print("高德SDK初始化失败: ${e.message}");
-      }
+    // 立即初始化隐私合规
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initPrivacy();
     });
+  }
+
+  Future<void> _initPrivacy() async {
+    try {
+      // 2. 显示隐私弹窗
+      if (!await _checkPrivacyAgreement()) {
+        final agreed = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => PrivacyPolicyDialog(
+            onAgreed: (agreed) {
+              Navigator.pop(context, agreed);
+            },
+          ),
+        );
+
+        if (agreed == true) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('privacyAgreed', true);
+          // 3. 初始化地图
+          await _initMap();
+        } else {
+          Navigator.pop(context);
+        }
+      } else {
+        // 已同意过，直接初始化地图
+        await _initMap();
+      }
+    } catch (e) {
+      print('隐私合规初始化失败: $e');
+    }
+  }
+
+  Future<void> _initMap() async {
+    try {
+      // 2. 获取位置权限和位置信息
+      await _getCurrentLocation();
+    } catch (e) {
+      print('地图初始化失败: $e');
+    }
   }
 
   /// 获取当前位置
   /// 使用Geolocator插件获取设备GPS位置
   Future<void> _getCurrentLocation() async {
     try {
-      // 在定位前检查隐私协议
-      if (!await _checkPrivacyAgreement()) {
-        await _showPrivacyDialog();
-      }
       setState(() => _isLoading = true);
 
       // 检查服务是否启用
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // 提示用户打开定位服务
         if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('请先启用定位服务')));
@@ -74,54 +99,30 @@ class _NavigationState extends State<Navigation> {
         return;
       }
 
+      // 请求权限
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.deniedForever) {
-        // 永久拒绝时的处理
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('需要在设置中授予定位权限')));
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return;
         }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
         return;
       }
 
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.whileInUse &&
-            permission != LocationPermission.always) {
-          return; // 用户拒绝权限
-        }
-      }
-
-      // 获取位置时添加try-catch
-      Position position = await Geolocator.getCurrentPosition().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('定位超时'),
-      );
-
-      if (mounted) {
-        setState(() {
-          _currentPosition = position;
-          _currentLatLng = LatLng(position.latitude, position.longitude);
-          _updateCurrentMarker();
-          _isLoading = false;
-        });
-      }
-    } on PlatformException catch (e) {
-      print('定位异常: ${e.message}');
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('定位失败: ${e.message}')));
-      }
+      // 获取位置
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentPosition = position;
+        _currentLatLng = LatLng(position.latitude, position.longitude);
+        _updateCurrentMarker();
+        _isLoading = false;
+      });
     } catch (e) {
       print('获取位置失败: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('获取位置失败')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() => _isLoading = false);
     }
   }
 
@@ -130,37 +131,20 @@ class _NavigationState extends State<Navigation> {
     return prefs.getBool('privacyAgreed') ?? false;
   }
 
-  Future<void> _showPrivacyDialog() async {
-    return showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-                title: Text('隐私政策'),
-                content: SingleChildScrollView(child: Text('...隐私政策内容...')),
-                actions: [
-                  TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: Text('拒绝')),
-                  ElevatedButton(
-                      onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('privacyAgreed', true);
-                        Navigator.pop(context);
-                      },
-                      child: Text('同意')),
-                ]));
-  }
-
   void _updateCurrentMarker() {
-    if (_currentLatLng == null) return;
+    // if (_currentLatLng == null) return;
 
-    _markers.clear();
-    _markers.add(Marker(
-      position: _currentLatLng!,
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-      infoWindow: const InfoWindow(title: "当前位置"),
-    ));
+    // _markers.clear();
+    // _markers.add(Marker(
+    //   position: _currentLatLng!,
+    //   icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+    //   infoWindow: const InfoWindow(title: "当前位置"),
+    // ));
+
+    // 使用 _mapController 移动相机
+    _mapController.moveCamera(
+      CameraUpdate.newLatLngZoom(_currentLatLng!, 15),
+    );
   }
 
   /// 搜索地点
@@ -203,12 +187,54 @@ class _NavigationState extends State<Navigation> {
       final dest = '${destination['location']}';
 
       final route = await _navigationService.getWalkingRoute(origin, dest);
-      setState(() {
-        _selectedRoute = route;
-        _isLoading = false;
-      });
+
+      // 添加路线到地图
+      if (route['route']['paths'].isNotEmpty) {
+        final path = route['route']['paths'][0];
+        final steps = path['steps'] as List;
+
+        List<LatLng> points = [];
+        for (var step in steps) {
+          final polyline = step['polyline'].split(';');
+          for (var point in polyline) {
+            final coords = point.split(',');
+            points.add(LatLng(
+              double.parse(coords[1]),
+              double.parse(coords[0]),
+            ));
+          }
+        }
+
+        setState(() {
+          _polylines.clear();
+          _polylines.add(Polyline(
+            points: points,
+            width: 5,
+            color: Colors.blue,
+          ));
+          _selectedRoute = route;
+        });
+
+        // 调整相机以显示整个路线
+        _mapController.moveCamera(
+          CameraUpdate.newLatLngBounds(
+            LatLngBounds(
+              southwest: LatLng(
+                points.map((p) => p.latitude).reduce(min),
+                points.map((p) => p.longitude).reduce(min),
+              ),
+              northeast: LatLng(
+                points.map((p) => p.latitude).reduce(max),
+                points.map((p) => p.longitude).reduce(max),
+              ),
+            ),
+            50.0, // padding
+          ),
+        );
+      }
     } catch (e) {
       print('规划路线失败: $e');
+    } finally {
       setState(() {
         _isLoading = false;
       });
@@ -228,13 +254,12 @@ class _NavigationState extends State<Navigation> {
             flex: 2,
             child: AMapWidget(
               onMapCreated: (controller) {
-                _mapController = controller;
-                if (_currentLatLng != null) {
-                  _mapController.moveCamera(CameraUpdate.newLatLngZoom(
-                    _currentLatLng!,
-                    16,
-                  ));
-                }
+                setState(() {
+                  _mapController = controller;
+                  if (_currentLatLng != null) {
+                    _updateCurrentMarker();
+                  }
+                });
               },
               markers: Set<Marker>.of(_markers),
               polylines: Set<Polyline>.of(_polylines),

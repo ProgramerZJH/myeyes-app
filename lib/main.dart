@@ -13,9 +13,6 @@ import 'package:myeyes/TTS.dart';
 // 导入Flutter基础UI组件
 import 'package:flutter/material.dart';
 
-// 导入隐私政策对话框组件
-import 'package:myeyes/privacy_policy_dialog.dart';
-
 // 导入应用设置插件，用于打开系统设置面板（如WiFi设置）
 //import 'package:app_settings/app_settings.dart';
 
@@ -28,14 +25,20 @@ import 'help.dart';
 // 导入导航页面组件
 import 'navigation.dart';
 
-import 'package:myeyes/amap_initializer.dart';
+//import 'package:myeyes/amap_initializer.dart';
+
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:x_amap_base/x_amap_base.dart';
+
+import 'package:amap_map/amap_map.dart';
 
 WiFiClient MyWifi = WiFiClient("192.168.185.33", 8080);
 TtsService tts = TtsService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   // 使用 MaterialApp 包装
   runApp(MaterialApp(
     home: const MyApp(),
@@ -53,54 +56,29 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  bool _hasShownPrivacyDialog = false;
-
   @override
   void initState() {
     super.initState();
-    // 延迟显示隐私政策弹窗
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showPrivacyDialogIfNeeded();
-    });
-  }
-
-  Future<void> _showPrivacyDialogIfNeeded() async {
-    if (!_hasShownPrivacyDialog) {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => PrivacyPolicyDialog(
-          onAgreed: (agreed) async {
-            if (agreed) {
-              // 用户同意后初始化地图
-              bool mapInitialized = await AMapInitializer.init();
-              if (!mapInitialized) {
-                print('高德地图初始化失败');
-              }
-            }
-            setState(() {
-              _hasShownPrivacyDialog = true;
-            });
-          },
-        ),
-      );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    AMapInitializer.init(context,
+        apiKey: AMapApiKey(androidKey: "b1d5458282af400870738a63af553eda"));
+    AMapInitializer.updatePrivacyAgree(
+        AMapPrivacyStatement(hasAgree: true, hasContains: true, hasShow: true));
     return MaterialApp(
-      debugShowCheckedModeBanner: false, //去掉debug图标
+      debugShowCheckedModeBanner: false,
       title: '',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: const ColorScheme.light(
-          primary: Colors.black, // 设置主要颜色
-          secondary: Colors.black87, // 设置背景色
-          surface: Colors.black87, // 设置表面颜色
-          onPrimary: Colors.white, // 设置主色上的文本颜色
-          onSecondary: Colors.white, // 设置背景上的文本颜色
-          onSurface: Colors.white, // 设置表面上的文本颜色
+          primary: Colors.black,
+          secondary: Colors.black87,
+          surface: Colors.black87,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.white,
         ),
       ),
       home: Builder(
@@ -471,9 +449,73 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                         ),
                       )),
                 ),
+                SizedBox(
+                  width: 800,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: _saveCurrentImage,
+                    child: const Text(
+                      '拍 摄',
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             )),
       )),
     ]));
+  }
+
+  Future<void> _saveCurrentImage() async {
+    if (MyWifi.getCurrentImage().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有可用的图像')),
+      );
+      tts.TTS_speakText('没有可用的图像');
+      return;
+    }
+
+    try {
+      // 获取外部存储权限
+      if (!await Permission.storage.request().isGranted) {
+        throw Exception('需要存储权限才能保存图片');
+      }
+
+      // 保存到相册目录
+      final directory = await getExternalStorageDirectory();
+      if (directory == null) throw Exception('无法访问存储目录');
+
+      // 创建 DCIM/MyEyes 目录
+      final myEyesDir = Directory('${directory.path}/DCIM/MyEyes');
+      if (!await myEyesDir.exists()) {
+        await myEyesDir.create(recursive: true);
+      }
+
+      final String fileName =
+          'MyEyes_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String filePath = '${myEyesDir.path}/$fileName';
+
+      // 保存图片
+      final File imageFile = File(filePath);
+      await imageFile.writeAsBytes(MyWifi.getCurrentImage());
+
+      // 通知媒体库扫描新文件
+      await const MethodChannel('com.example.myeyes/media_scanner')
+          .invokeMethod('scanFile', {'path': filePath});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('图片已保存到: ${myEyesDir.path}')),
+      );
+      tts.TTS_speakText('图片已保存到相册');
+    } catch (e) {
+      print('保存图片失败: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存图片失败: $e')),
+      );
+      tts.TTS_speakText('保存图片失败');
+    }
   }
 }
