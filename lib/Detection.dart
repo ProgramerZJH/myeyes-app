@@ -48,8 +48,12 @@ class MyDetection {
       _vision = FlutterVision();
       try {
         await _vision!.loadYoloModel(
-            labels: 'assets/yolov5.txt',
-            modelPath: 'assets/yolov5.tflite',
+            labels: 'assets/best.txt',
+            //labels: 'assets/yolov5.txt',
+            //labels: 'yoloAnother/classes.txt',
+            modelPath: 'assets/best.tflite',
+            //modelPath: 'assets/yolov5.tflite',
+            //modelPath: 'yoloAnother/best.onnx',
             modelVersion: "yolov5",
             quantization: false,
             numThreads: 5,
@@ -151,7 +155,7 @@ class MyDetection {
   //------------------------检测到的物体是否大到需要提醒-----------------------------
   static bool judge_Near_Obj(double x, w, String detectedClass) {
     //若目标体积较大（较近）,且在屏幕中间，则存在map里
-    if ((w >= 0.55) && (0.3 <= x && x <= 0.6)) {
+    if ((w >= 0.55) && (0.33 <= x && x <= 0.67)) {
       // 检查该物体是否已经在Map中
       if (YOLO_Obj0.containsKey('前$detectedClass')) {
         // 已存在则计数加1
@@ -164,7 +168,7 @@ class MyDetection {
       }
     }
     //若目标体积较大（较近）,且在屏幕左侧，则存在map里
-    if ((w >= 0.55) && (0 <= x && x < 0.3)) {
+    if ((w >= 0.55) && (0 <= x && x < 0.33)) {
       if (YOLO_Obj0.containsKey('左$detectedClass')) {
         YOLO_Obj0['左$detectedClass'] = (YOLO_Obj0['左$detectedClass'])! + 1;
         return true;
@@ -174,7 +178,7 @@ class MyDetection {
       }
     }
     //若目标体积较大（较近）,且在屏幕右侧，则存在map里
-    if ((w >= 0.55) && (0.6 < x && x <= 1)) {
+    if ((w >= 0.55) && (0.67 < x && x <= 1)) {
       if (YOLO_Obj0.containsKey('右$detectedClass')) {
         YOLO_Obj0['右$detectedClass'] = (YOLO_Obj0['右$detectedClass'])! + 1;
         return true;
@@ -190,7 +194,7 @@ class MyDetection {
   //------------------------检测到的物体是否需要提醒--------------------------------
   // 判断检测到的物体是否为需要关注的普通物体，并根据位置添加到普通物体Map中
   static bool judge_Point_Obj(double x, String detectedClass) {
-    if (0.3 <= x && x <= 0.6) {
+    if (0.33 <= x && x <= 0.67) {
       if (YOLO_Obj1.containsKey('前$detectedClass')) {
         YOLO_Obj1['前$detectedClass'] = (YOLO_Obj1['前$detectedClass'])! + 1;
         return true;
@@ -199,7 +203,7 @@ class MyDetection {
         return true;
       }
     }
-    if (0 <= x && x < 0.3) {
+    if (0 <= x && x < 0.33) {
       if (YOLO_Obj1.containsKey('左$detectedClass')) {
         YOLO_Obj1['左$detectedClass'] = (YOLO_Obj1['左$detectedClass'])! + 1;
         return true;
@@ -208,7 +212,7 @@ class MyDetection {
         return true;
       }
     }
-    if (0.6 < x && x <= 1) {
+    if (0.67 < x && x <= 1) {
       if (YOLO_Obj1.containsKey('右$detectedClass')) {
         YOLO_Obj1['右$detectedClass'] = (YOLO_Obj1['右$detectedClass'])! + 1;
         return true;

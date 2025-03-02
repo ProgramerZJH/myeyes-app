@@ -25,10 +25,10 @@ import 'help.dart';
 // 导入导航页面组件
 import 'navigation.dart';
 
-//import 'package:myeyes/amap_initializer.dart';
-
-import 'package:path_provider/path_provider.dart';
+import 'services/openai_service.dart';
+import 'dart:convert';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 
@@ -268,16 +268,8 @@ class MyHomePage extends StatefulWidget {
 //-----------------------------主页面示内容--------------------------------------
 class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   TtsService mytts = TtsService();
-  //final TextEditingController _ipController = TextEditingController();
 
   bool _previousConnectState = false; // 添加变量跟踪之前的连接状态
-
-  /*
-  //暴露出的在其他文件中刷新ui的方法
-  void _refreshUI() {
-    setState(() {});
-  }
-  */
 
   @override
   void initState() {
@@ -296,14 +288,6 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       }
       setState(() {});
     };
-    /*
-    FlutterLifecycleDetector().onBackgroundChange.listen((isBackground) async {
-      if (!isBackground) {
-        await MyWifi.connectAndCommunicate();
-        tts.TTS_speakImpText('设备连接成功');
-      }
-    });
-    */
   }
 
   Widget buildImageWidget() {
@@ -351,27 +335,6 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 40),
                 SizedBox(child: buildImageWidget()),
                 const SizedBox(height: 30),
-                /*
-                  SizedBox(
-                    width: 800,
-                    height: 60,
-                    child: ElevatedButton(
-                        onPressed: MyWifi.connect_state
-                            ? null
-                            : () {
-                                AppSettings.openAppSettingsPanel(
-                                    AppSettingsPanelType.wifi);
-                                tts.TTS_speakImpText(
-                                    '请在当前界面内找到名为H O M E的设备并连接');
-                              },
-                        child: const Text("打开wifi设置",
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ))),
-                  ),
-                  const SizedBox(height: 15),
-                  */
                 SizedBox(
                   width: 800,
                   height: 60,
@@ -434,34 +397,40 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                       )),
                 ),
                 const SizedBox(height: 15),
-                SizedBox(
-                  width: 800,
-                  height: 60,
-                  child: ElevatedButton(
-                      onPressed: () {
-                        SystemNavigator.pop();
-                      },
-                      child: const Text(
-                        '退 出',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Colors.white,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    SizedBox(
+                      width: 380,
+                      height: 60,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          SystemNavigator.pop();
+                        },
+                        child: const Text(
+                          '退 出',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                          ),
                         ),
-                      )),
-                ),
-                SizedBox(
-                  width: 800,
-                  height: 60,
-                  child: ElevatedButton(
-                    onPressed: _saveCurrentImage,
-                    child: const Text(
-                      '拍 摄',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.white,
                       ),
                     ),
-                  ),
+                    SizedBox(
+                      width: 380,
+                      height: 60,
+                      child: ElevatedButton(
+                        onPressed: _saveCurrentImage,
+                        child: const Text(
+                          '拍 摄',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             )),
@@ -474,48 +443,88 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('没有可用的图像')),
       );
-      tts.TTS_speakText('没有可用的图像');
+      //tts.TTS_speakText('没有可用的图像');
       return;
     }
 
+    Uint8List image = MyWifi.getCurrentImage();
+
     try {
-      // 获取外部存储权限
-      if (!await Permission.storage.request().isGranted) {
-        throw Exception('需要存储权限才能保存图片');
+      // 第一步：分析图像并播报
+      final openAIService = OpenAIService();
+      final base64Image = base64Encode(image);
+      final result = await openAIService.analyzeImage(base64Image);
+      tts.TTS_speakText(result);
+
+      // 第二步：保存图像
+      try {
+        // 获取外部存储权限
+        if (!await Permission.storage.request().isGranted) {
+          throw Exception('需要存储权限才能保存图片');
+        }
+
+        // 使用更可靠的路径获取方法
+        Directory? directory;
+        if (Platform.isAndroid) {
+          // 尝试获取DCIM目录
+          try {
+            directory = Directory('/storage/emulated/0/DCIM/MyEyes');
+            if (!await directory.exists()) {
+              await directory.create(recursive: true);
+            }
+          } catch (e) {
+            // 如果失败，回退到应用目录
+            final appDir = await getExternalStorageDirectory();
+            if (appDir == null) throw Exception('无法访问存储目录');
+
+            directory = Directory('${appDir.path}/DCIM/MyEyes');
+            if (!await directory.exists()) {
+              await directory.create(recursive: true);
+            }
+          }
+        } else {
+          // 其他平台
+          final appDir = await getApplicationDocumentsDirectory();
+          directory = Directory('${appDir.path}/MyEyes');
+          if (!await directory.exists()) {
+            await directory.create(recursive: true);
+          }
+        }
+
+        // 保存文件
+        final String fileName =
+            'MyEyes_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final String filePath = '${directory.path}/$fileName';
+
+        final File imageFile = File(filePath);
+        await imageFile.writeAsBytes(image);
+
+        // 在Android上，通知媒体扫描器
+        if (Platform.isAndroid) {
+          try {
+            await const MethodChannel('com.example.myeyes/media_scanner')
+                .invokeMethod('scanFile', {'path': filePath});
+          } catch (e) {
+            print('通知媒体扫描失败: $e');
+            // 即使媒体扫描器失败，文件仍然已保存
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('图片已保存到: ${directory.path}')),
+        );
+      } catch (e) {
+        print('保存图片失败: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存图片失败: $e')),
+        );
+        //tts.TTS_speakText('保存图片失败');
       }
-
-      // 保存到相册目录
-      final directory = await getExternalStorageDirectory();
-      if (directory == null) throw Exception('无法访问存储目录');
-
-      // 创建 DCIM/MyEyes 目录
-      final myEyesDir = Directory('${directory.path}/DCIM/MyEyes');
-      if (!await myEyesDir.exists()) {
-        await myEyesDir.create(recursive: true);
-      }
-
-      final String fileName =
-          'MyEyes_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final String filePath = '${myEyesDir.path}/$fileName';
-
-      // 保存图片
-      final File imageFile = File(filePath);
-      await imageFile.writeAsBytes(MyWifi.getCurrentImage());
-
-      // 通知媒体库扫描新文件
-      await const MethodChannel('com.example.myeyes/media_scanner')
-          .invokeMethod('scanFile', {'path': filePath});
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('图片已保存到: ${myEyesDir.path}')),
-      );
-      tts.TTS_speakText('图片已保存到相册');
     } catch (e) {
-      print('保存图片失败: $e');
+      print('图像处理失败: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存图片失败: $e')),
+        SnackBar(content: Text('图像处理失败: $e')),
       );
-      tts.TTS_speakText('保存图片失败');
     }
   }
 }

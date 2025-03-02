@@ -163,65 +163,92 @@ class _NavigationState extends State<Navigation> {
 
     setState(() {
       _isLoading = true;
+      _polylines.clear(); // 清除现有路线
     });
 
     try {
       final origin =
           '${_currentPosition!.longitude},${_currentPosition!.latitude}';
-      final dest = '${destination['location']}';
+      final dest = destination['location'];
+
+      if (dest == null) {
+        throw Exception('目的地坐标无效');
+      }
 
       final route = await _navigationService.getWalkingRoute(origin, dest);
 
-      // 添加路线到地图
-      if (route['route']['paths'].isNotEmpty) {
+      if (route['route'] != null &&
+          route['route']['paths'] != null &&
+          (route['route']['paths'] as List).isNotEmpty) {
         final path = route['route']['paths'][0];
         final steps = path['steps'] as List;
 
+        // 收集所有路线点
         List<LatLng> points = [];
         for (var step in steps) {
-          final polyline = step['polyline'].split(';');
-          for (var point in polyline) {
-            final coords = point.split(',');
-            points.add(LatLng(
-              double.parse(coords[1]),
-              double.parse(coords[0]),
-            ));
+          if (step['polyline'] != null) {
+            final polyline = step['polyline'].toString().split(';');
+            for (var point in polyline) {
+              final coords = point.split(',');
+              if (coords.length == 2) {
+                try {
+                  final lat = double.parse(coords[1]);
+                  final lng = double.parse(coords[0]);
+                  points.add(LatLng(lat, lng));
+                } catch (e) {
+                  print('坐标解析错误: $e');
+                  continue;
+                }
+              }
+            }
           }
         }
 
-        setState(() {
-          _polylines.clear();
-          _polylines.add(Polyline(
-            points: points,
-            width: 5,
-            color: Colors.blue,
-          ));
-          _selectedRoute = route;
-        });
+        if (points.isNotEmpty) {
+          setState(() {
+            // 使用更简单的路线样式
+            _polylines.add(
+              Polyline(
+                width: 10,
+                color: Colors.blue,
+                points: points,
+                // 移除可能导致崩溃的其他属性
+              ),
+            );
+            _selectedRoute = route;
+          });
 
-        // 调整相机以显示整个路线
-        _mapController.moveCamera(
-          CameraUpdate.newLatLngBounds(
-            LatLngBounds(
-              southwest: LatLng(
-                points.map((p) => p.latitude).reduce(min),
-                points.map((p) => p.longitude).reduce(min),
-              ),
-              northeast: LatLng(
-                points.map((p) => p.latitude).reduce(max),
-                points.map((p) => p.longitude).reduce(max),
-              ),
-            ),
-            50.0, // padding
-          ),
-        );
+          // 调整地图视野以显示整个路线
+          if (points.length >= 2) {
+            double minLat = points.map((p) => p.latitude).reduce(min);
+            double maxLat = points.map((p) => p.latitude).reduce(max);
+            double minLng = points.map((p) => p.longitude).reduce(min);
+            double maxLng = points.map((p) => p.longitude).reduce(max);
+
+            LatLngBounds bounds = LatLngBounds(
+              southwest: LatLng(minLat, minLng),
+              northeast: LatLng(maxLat, maxLng),
+            );
+
+            _mapController.moveCamera(
+              CameraUpdate.newLatLngBounds(bounds, 50.0),
+            );
+          }
+        }
       }
     } catch (e) {
       print('规划路线失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('获取路线失败: $e')),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

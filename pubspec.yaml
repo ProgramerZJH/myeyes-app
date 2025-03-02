@@ -23,6 +23,7 @@ dependencies:
   http: ^1.1.0                      # HTTP请求
   cupertino_icons: ^1.0.2           # iOS风格图标 
   amap_map: ^1.0.12
+  dart_openai: ^5.1.0
   
   opencv_dart: ^1.4.1               # OpenCV图像处理
   url_launcher: ^6.3.0

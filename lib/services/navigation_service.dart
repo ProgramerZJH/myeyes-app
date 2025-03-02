@@ -69,12 +69,18 @@ class NavigationService {
     try {
       final response = await http.get(
         Uri.parse('$_routeUrl?key=$_apiKey&origin=$origin'
-            '&destination=$destination'),
+            '&destination=$destination&extensions=all'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == '1') {
+          // 验证返回的数据格式
+          if (data['route'] == null ||
+              data['route']['paths'] == null ||
+              (data['route']['paths'] as List).isEmpty) {
+            throw Exception('未找到有效路线');
+          }
           return data;
         } else {
           throw Exception('API返回错误: ${data['info']}');
