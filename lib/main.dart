@@ -27,9 +27,11 @@ import 'navigation.dart';
 
 import 'services/openai_service.dart';
 import 'dart:convert';
+/*
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+*/
 import 'package:x_amap_base/x_amap_base.dart';
 
 import 'package:amap_map/amap_map.dart';
@@ -270,6 +272,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   TtsService mytts = TtsService();
 
   bool _previousConnectState = false; // 添加变量跟踪之前的连接状态
+  bool _isConnecting = false;
 
   @override
   void initState() {
@@ -367,13 +370,27 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                   width: 800,
                   height: 60,
                   child: ElevatedButton(
-                      onPressed: MyWifi.connect_state
+                      onPressed: (MyWifi.connect_state || _isConnecting)
                           ? null
                           : () async {
+                              setState(() {
+                                _isConnecting = true;
+                              });
+                              tts.TTS_speakText('正在连接');
+
                               await MyWifi.connectAndCommunicate();
+
+                              // 10秒后才能再次点击
+                              Future.delayed(const Duration(seconds: 10), () {
+                                if (mounted) {
+                                  setState(() {
+                                    _isConnecting = false;
+                                  });
+                                }
+                              });
                             },
-                      child: const Text("open my eyes",
-                          style: TextStyle(
+                      child: Text(_isConnecting ? "正在连接..." : "open my eyes",
+                          style: const TextStyle(
                             fontSize: 20,
                             color: Colors.white,
                           ))),
@@ -401,9 +418,15 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     SizedBox(
-                      width: 380,
+                      width:
+                          MediaQuery.of(context).size.width * 0.4, // 屏幕宽度的40%
                       height: 60,
                       child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                         onPressed: () {
                           SystemNavigator.pop();
                         },
@@ -417,12 +440,18 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                       ),
                     ),
                     SizedBox(
-                      width: 380,
+                      width:
+                          MediaQuery.of(context).size.width * 0.4, // 屏幕宽度的40%
                       height: 60,
                       child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                         onPressed: _saveCurrentImage,
                         child: const Text(
-                          '拍 摄',
+                          '解 读',
                           style: TextStyle(
                             fontSize: 20,
                             color: Colors.white,
@@ -443,87 +472,37 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('没有可用的图像')),
       );
-      //tts.TTS_speakText('没有可用的图像');
+      tts.TTS_speakText('没有可用的图像');
       return;
     }
 
     Uint8List image = MyWifi.getCurrentImage();
 
     try {
-      // 第一步：分析图像并播报
       final openAIService = OpenAIService();
       final base64Image = base64Encode(image);
-      final result = await openAIService.analyzeImage(base64Image);
-      tts.TTS_speakText(result);
 
-      // 第二步：保存图像
-      try {
-        // 获取外部存储权限
-        if (!await Permission.storage.request().isGranted) {
-          throw Exception('需要存储权限才能保存图片');
+      // 添加加载状态提示
+      tts.TTS_speakText('图片分析中，请稍候');
+
+      final result = await openAIService
+          .analyzeImage(base64Image)
+          .timeout(const Duration(seconds: 30), onTimeout: () {
+        return "分析超时，请检查网络连接";
+      });
+
+      // 处理长文本的分段播报
+      final segments = result.split('。');
+      for (final segment in segments) {
+        if (segment.trim().isNotEmpty) {
+          await tts.TTS_speakText(segment.trim());
         }
-
-        // 使用更可靠的路径获取方法
-        Directory? directory;
-        if (Platform.isAndroid) {
-          // 尝试获取DCIM目录
-          try {
-            directory = Directory('/storage/emulated/0/DCIM/MyEyes');
-            if (!await directory.exists()) {
-              await directory.create(recursive: true);
-            }
-          } catch (e) {
-            // 如果失败，回退到应用目录
-            final appDir = await getExternalStorageDirectory();
-            if (appDir == null) throw Exception('无法访问存储目录');
-
-            directory = Directory('${appDir.path}/DCIM/MyEyes');
-            if (!await directory.exists()) {
-              await directory.create(recursive: true);
-            }
-          }
-        } else {
-          // 其他平台
-          final appDir = await getApplicationDocumentsDirectory();
-          directory = Directory('${appDir.path}/MyEyes');
-          if (!await directory.exists()) {
-            await directory.create(recursive: true);
-          }
-        }
-
-        // 保存文件
-        final String fileName =
-            'MyEyes_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final String filePath = '${directory.path}/$fileName';
-
-        final File imageFile = File(filePath);
-        await imageFile.writeAsBytes(image);
-
-        // 在Android上，通知媒体扫描器
-        if (Platform.isAndroid) {
-          try {
-            await const MethodChannel('com.example.myeyes/media_scanner')
-                .invokeMethod('scanFile', {'path': filePath});
-          } catch (e) {
-            print('通知媒体扫描失败: $e');
-            // 即使媒体扫描器失败，文件仍然已保存
-          }
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('图片已保存到: ${directory.path}')),
-        );
-      } catch (e) {
-        print('保存图片失败: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存图片失败: $e')),
-        );
-        //tts.TTS_speakText('保存图片失败');
       }
     } catch (e) {
       print('图像处理失败: $e');
+      tts.TTS_speakText('图片解读失败，请重试');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('图像处理失败: $e')),
+        SnackBar(content: Text('处理失败: ${e.toString()}')),
       );
     }
   }

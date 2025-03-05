@@ -16,7 +16,7 @@ import 'package:myeyes/TTS.dart';
 // 导入OpenCV图像处理库
 import 'package:opencv_dart/opencv_dart.dart';
 
-//import 'dart:collection'; // 添加这一行
+import 'dart:collection'; // 添加这一行
 
 /// WiFi客户端类
 /// 负责与眼镜端建立Socket连接并处理图像数据
@@ -69,18 +69,10 @@ class WiFiClient {
   final Duration _imageTimeout = const Duration(seconds: 1);
   DateTime? _lastImageUpdate;
 
-  // 限制重连频率
-  DateTime _lastReconnectAttempt = DateTime.now();
-  final Duration _reconnectThrottle = const Duration(seconds: 2);
-
   // 添加缓冲区大小控制
-  static const int BUFFER_SIZE = 131072; // 增加到128KB 缓冲区
-  final List<int> _dataBuffer = [];
+  static const int BUFFER_SIZE = 65536; // 64KB 缓冲区
+  final Queue<Uint8List> _dataBuffer = Queue<Uint8List>();
   bool _isProcessing = false;
-
-  // 添加一个图像处理标志，防止过于频繁处理
-  int _lastProcessedTimestamp = 0;
-  static const int PROCESS_THROTTLE_MS = 100; // 最短处理间隔(毫秒)
 
   // 构造函数，初始化IP和端口
   WiFiClient(this.ip, this.port);
@@ -88,197 +80,57 @@ class WiFiClient {
   /// 建立Socket连接并开始通信
   Future<void> connectAndCommunicate() async {
     try {
-      socket =
-          await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
+      socket = await Socket.connect(ip, port);
       socket!.setOption(SocketOption.tcpNoDelay, true); // 禁用Nagle算法
-
       connect_state = true;
       print('Connected to server');
-      addLog('已连接到服务器: $ip:$port');
 
-      // 使用compute隔离处理数据流，避免阻塞主线程
       socket!.listen(
-        (data) {
-          // 直接处理数据，不使用额外的异步
-          handleIncomingData(data);
+        (data) async {
+          await handleIncomingData(data);
         },
         onError: (error) {
           print('Error: $error');
-          addLog('连接错误: $error');
-          _handleDisconnect();
+          _resetState();
+          reconnect();
         },
         onDone: () {
           print('Server disconnected');
-          addLog('服务器断开连接');
-          _handleDisconnect();
+          _resetState();
+          reconnect();
         },
       );
-
-      _startImageMonitor();
     } catch (e) {
       print('Failed to connect: $e');
-      addLog('连接失败: $e');
       connect_state = false;
-      if (refreash != null) {
-        refreash!();
-      }
-    }
-  }
-
-  void _handleDisconnect() {
-    if (connect_state) {
-      connect_state = false;
-      _resetState();
-      if (refreash != null) {
-        refreash!();
-      }
-
-      // 使用节流控制重连频率
-      final now = DateTime.now();
-      if (now.difference(_lastReconnectAttempt) > _reconnectThrottle) {
-        _lastReconnectAttempt = now;
-        Future.delayed(const Duration(seconds: 1), () {
-          reconnect();
-        });
-      }
     }
   }
 
   /// 处理接收到的数据
   /// [data] 接收到的二进制数据
-  void handleIncomingData(Uint8List data) {
+  Future<void> handleIncomingData(Uint8List data) async {
     try {
-      // 直接将数据添加到缓冲区
-      _dataBuffer.addAll(data);
+      _dataBuffer.add(data);
 
       if (!_isProcessing) {
-        _processBufferedData();
+        _isProcessing = true;
+        while (_dataBuffer.isNotEmpty) {
+          final currentData = _dataBuffer.removeFirst();
+          await _processData(currentData);
+        }
+        _isProcessing = false;
       }
     } catch (e) {
       addLog('数据处理错误: $e');
-    }
-  }
-
-  void _processBufferedData() {
-    _isProcessing = true;
-
-    try {
-      // 添加溢出控制：如果缓冲区太大，则清空缓冲区并重新开始
-      if (_dataBuffer.length > BUFFER_SIZE * 2) {
-        addLog('缓冲区溢出，清空缓冲区');
-        _dataBuffer.clear();
-        _resetState();
-        return;
-      }
-
-      // 处理初始大小信息（如果有的话）
-      if (!isReceivingImage && _dataBuffer.length >= 4) {
-        final sizeBytes = Uint8List.fromList(_dataBuffer.sublist(0, 4));
-        expectedImageSize =
-            ByteData.view(sizeBytes.buffer).getUint32(0, Endian.little);
-        _dataBuffer.removeRange(0, 4);
-        isReceivingImage = true;
-        currentImageData = Uint8List(0);
-        addLog('预期图片大小: $expectedImageSize 字节');
-      }
-
-      // 处理图像数据
-      if (isReceivingImage && _dataBuffer.isNotEmpty) {
-        // 将缓冲区数据添加到当前图像
-        final bytesToAdd = _dataBuffer.length;
-        currentImageData = Uint8List.fromList(
-            [...currentImageData, ..._dataBuffer.sublist(0, bytesToAdd)]);
-        _dataBuffer.removeRange(0, bytesToAdd);
-
-        // 检查是否接收完成
-        if (currentImageData.length >= expectedImageSize) {
-          _processCompletedImage();
-        }
-      }
-    } catch (e) {
-      addLog('缓冲区处理错误: $e');
       _resetState();
-    } finally {
-      _isProcessing = false;
-
-      // 如果缓冲区中还有数据，继续处理
-      if (_dataBuffer.length >= 4 && !isReceivingImage) {
-        _processBufferedData();
-      }
-    }
-  }
-
-  Future<void> _processCompletedImage() async {
-    if (!isReceivingImage || currentImageData.length < expectedImageSize)
-      return;
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    // 限制处理频率，如果距离上次处理时间太短，则跳过
-    if (now - _lastProcessedTimestamp < PROCESS_THROTTLE_MS) {
-      _resetState();
-      return;
-    }
-    _lastProcessedTimestamp = now;
-
-    isReceivingImage = false;
-    addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
-
-    // 验证图像数据
-    if (currentImageData.length != expectedImageSize) {
-      addLog('图像数据大小不匹配，跳过处理');
-      _resetState();
-      return;
-    }
-
-    // 处理图像
-    if (!isProcessingImage) {
-      isProcessingImage = true;
-
-      try {
-        // 直接发送原始图像到UI，减少延迟
-        imageStreamController.add(currentImageData);
-        _lastImageUpdate = DateTime.now();
-
-        // 异步处理目标检测（可选）
-        if (currentImageData.isNotEmpty) {
-          // 使用compute在隔离区进行图像处理
-          compute(MyDetection.Det_StartInference, currentImageData).then((_) {
-            // 可选的图像后处理
-            try {
-              // 解码和重新编码图像（可选）
-              final mat = imdecode(currentImageData, IMREAD_COLOR);
-              final (success, encodedBytes) = imencode('.jpg', mat);
-
-              if (success) {
-                processedImageData = encodedBytes;
-              } else {
-                processedImageData = currentImageData;
-              }
-
-              mat.dispose(); // 释放资源
-            } catch (e) {
-              addLog('图像处理错误: $e');
-              processedImageData = currentImageData;
-            }
-          });
-        }
-
-        // 刷新UI
-        if (refreash != null) {
-          refreash!();
-        }
-      } catch (e) {
-        addLog('处理图像时发生错误: $e');
-      } finally {
-        isProcessingImage = false;
-        _resetState();
-      }
     }
   }
 
   void _resetState() {
     isReceivingImage = false;
     isProcessingImage = false;
+    _isProcessing = false;
+    _dataBuffer.clear();
     currentImageData = Uint8List(0);
     expectedImageSize = 0;
   }
@@ -287,9 +139,6 @@ class WiFiClient {
   void disconnect() {
     socket?.close();
     connect_state = false;
-    if (refreash != null) {
-      refreash!();
-    }
   }
 
   /// 设置新的IP地址
@@ -332,28 +181,109 @@ class WiFiClient {
 
   // 添加图像监控机制
   void _startImageMonitor() {
-    Timer.periodic(const Duration(milliseconds: 1000), (timer) {
-      if (!connect_state) {
-        timer.cancel();
-        return;
-      }
-
+    Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_lastImageUpdate != null) {
         final difference = DateTime.now().difference(_lastImageUpdate!);
         if (difference > _imageTimeout) {
-          addLog('图像更新超时，尝试重新连接...');
-          _handleDisconnect();
+          print('图像更新超时，尝试重新连接...');
+          reconnect();
         }
       }
     });
   }
 
-  // 修改重连方法
+  // 修改连接方法
+  Future<void> connect() async {
+    try {
+      socket = await Socket.connect(ip, port);
+      _startImageMonitor();
+      // ... 其他连接代码 ...
+    } catch (e) {
+      print('连接错误: $e');
+    }
+  }
+
+  // 添加重连方法
   Future<void> reconnect() async {
-    if (!connect_state) {
-      socket?.close();
-      socket = null;
-      await connectAndCommunicate();
+    socket?.close();
+    socket = null;
+    await connect();
+  }
+
+  Future<void> _processData(Uint8List data) async {
+    try {
+      if (data.length == 4 && !isReceivingImage) {
+        expectedImageSize =
+            ByteData.view(data.buffer).getUint32(0, Endian.little);
+        addLog('预期图片大小: $expectedImageSize 字节');
+        currentImageData = Uint8List(0);
+        isReceivingImage = true;
+      }
+      // 如果正在接收图像数据
+      else if (isReceivingImage) {
+        // 将新接收的数据追加到当前图像数据中
+        currentImageData = Uint8List.fromList([...currentImageData, ...data]);
+        addLog('当前接收数据长度: ${currentImageData.length} 字节');
+
+        if (currentImageData.length >= expectedImageSize) {
+          isReceivingImage = false;
+          addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
+
+          // 如果数据大小正确且未在处理中，则开始处理图像
+          if (currentImageData.length == expectedImageSize &&
+              !isProcessingImage) {
+            isProcessingImage = true;
+
+            try {
+              // 进行目标检测
+              await MyDetection.Det_StartInference(currentImageData);
+
+              // 使用OpenCV处理图像
+              try {
+                // 从内存中解码JPEG数据
+                final mat = imdecode(currentImageData, IMREAD_COLOR);
+
+                // 直接编码为JPEG，不进行颜色空间转换
+                final (success, encodedBytes) = imencode('.jpg', mat);
+                if (success) {
+                  // 通过 Stream 发送图像数据
+                  imageStreamController.add(encodedBytes);
+                  processedImageData = encodedBytes;
+                  addLog('图像处理成功');
+                } else {
+                  processedImageData = currentImageData;
+                }
+
+                // 释放OpenCV资源
+                mat.dispose();
+              } catch (e) {
+                addLog('OpenCV处理错误: $e');
+                processedImageData = currentImageData;
+              }
+
+              // 如果存在刷新回调，则刷新UI
+              if (refreash != null) {
+                refreash!();
+              }
+            } catch (e) {
+              addLog('处理图像时发生错误: $e');
+            } finally {
+              isProcessingImage = false;
+            }
+          }
+
+          // 清理数据，准备接收下一张图像
+          currentImageData = Uint8List(0);
+          expectedImageSize = 0;
+        }
+      }
+    } catch (e) {
+      // 发生错误时重置所有状态
+      addLog('数据处理错误: $e');
+      isReceivingImage = false;
+      isProcessingImage = false;
+      currentImageData = Uint8List(0);
+      expectedImageSize = 0;
     }
   }
 }
