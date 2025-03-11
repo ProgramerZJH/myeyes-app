@@ -48,11 +48,13 @@ class MyDetection {
       _vision = FlutterVision();
       try {
         await _vision!.loadYoloModel(
+            labels: 'assets/best-fp16.txt',
             //labels: 'assets/best.txt',
-            labels: 'assets/yolov5.txt',
+            //labels: 'assets/yolov5.txt',
             //labels: 'yoloAnother/classes.txt',
+            modelPath: 'assets/best-fp16.tflite',
             //modelPath: 'assets/best.tflite',
-            modelPath: 'assets/yolov5.tflite',
+            //modelPath: 'assets/yolov5.tflite',
             //modelPath: 'yoloAnother/best.onnx',
             modelVersion: "yolov5",
             quantization: false,

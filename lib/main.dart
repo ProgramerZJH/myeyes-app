@@ -36,7 +36,12 @@ import 'package:x_amap_base/x_amap_base.dart';
 
 import 'package:amap_map/amap_map.dart';
 
-WiFiClient MyWifi = WiFiClient("192.168.185.33", 8080);
+// 在文件顶部添加雷达客户端导入
+import 'wifi_leida.dart';
+
+// 在全局变量中添加雷达客户端实例
+WiFiClient MyWifi = WiFiClient("192.168.37.33", 8080);
+RadarClient MyRadar = RadarClient("192.168.37.33", 8082); // 使用相同IP但不同端口
 TtsService tts = TtsService();
 
 void main() async {
@@ -208,7 +213,9 @@ class _MyAppState extends State<MyApp> {
                                       r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
 
                                   if (ipRegex.hasMatch(ipController.text)) {
+                                    // 同时更新两个设备的IP地址
                                     MyWifi.set_Ip(ipController.text);
+                                    MyRadar.setIp(ipController.text);
                                     Navigator.of(context).pop();
                                   } else {
                                     showDialog(
@@ -291,6 +298,12 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       }
       setState(() {});
     };
+
+    // 监听雷达障碍物流
+    MyRadar.obstacleStream.listen((data) {
+      // 可以在这里处理UI更新等
+      setState(() {});
+    });
   }
 
   Widget buildImageWidget() {
@@ -311,160 +324,298 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: Column(children: <Widget>[
-      Center(
-          child: Container(
-        child: Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200], // 容器的背景颜色
-                      borderRadius: BorderRadius.circular(15.0), // 设置圆角半径为 15.0
-                    ),
-                    alignment: Alignment.center,
-                    width: 1000,
-                    height: 50,
-                    child: Text(
-                      '眼镜连接状态：${MyWifi.connect_state ? '已连接' : '未连接'}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18, // 设置文字大小为18
-                        color: Colors.black,
-                      ),
-                    )),
-                const SizedBox(height: 40),
-                SizedBox(child: buildImageWidget()),
-                const SizedBox(height: 30),
-                SizedBox(
-                  width: 800,
-                  height: 60,
-                  child: ElevatedButton(
-                      onPressed: () async {
-                        const platform =
-                            MethodChannel('com.example.myeyes/hotspot');
-                        try {
-                          await platform.invokeMethod('openHotspotSettings');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('请开启个人热点')),
-                          );
-                          tts.TTS_speakText('请开启个人热点');
-                        } catch (e) {
-                          print('开启热点失败: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('开启热失败，请手动开启')),
-                          );
-                          tts.TTS_speakText('开启热点失败，请手动开启');
-                        }
-                      },
-                      child: const Text("连接热点",
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.white,
-                          ))),
-                ),
-                const SizedBox(height: 15),
-                SizedBox(
-                  width: 800,
-                  height: 60,
-                  child: ElevatedButton(
-                      onPressed: (MyWifi.connect_state || _isConnecting)
-                          ? null
-                          : () async {
-                              setState(() {
-                                _isConnecting = true;
-                              });
-                              tts.TTS_speakText('正在连接');
-
-                              await MyWifi.connectAndCommunicate();
-
-                              // 10秒后才能再次点击
-                              Future.delayed(const Duration(seconds: 10), () {
-                                if (mounted) {
-                                  setState(() {
-                                    _isConnecting = false;
-                                  });
-                                }
-                              });
+      body: SingleChildScrollView(
+        // 添加滚动视图
+        child: Column(
+          children: <Widget>[
+            Center(
+              child: Container(
+                child: Padding(
+                  padding: const EdgeInsets.all(30),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200], // 容器的背景颜色
+                            borderRadius:
+                                BorderRadius.circular(15.0), // 设置圆角半径为 15.0
+                          ),
+                          alignment: Alignment.center,
+                          width: 1000,
+                          height: 50,
+                          child: Text(
+                            '眼镜连接状态：${MyWifi.connect_state ? '已连接' : '未连接'}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18, // 设置文字大小为18
+                              color: Colors.black,
+                            ),
+                          )),
+                      const SizedBox(height: 40),
+                      SizedBox(child: buildImageWidget()),
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        width: 800,
+                        height: 60,
+                        child: ElevatedButton(
+                            onPressed: () async {
+                              const platform =
+                                  MethodChannel('com.example.myeyes/hotspot');
+                              try {
+                                await platform
+                                    .invokeMethod('openHotspotSettings');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('请开启个人热点')),
+                                );
+                                tts.TTS_speakText('请开启个人热点');
+                              } catch (e) {
+                                print('开启热点失败: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('开启热失败，请手动开启')),
+                                );
+                                tts.TTS_speakText('开启热点失败，请手动开启');
+                              }
                             },
-                      child: Text(_isConnecting ? "正在连接..." : "open my eyes",
-                          style: const TextStyle(
-                            fontSize: 20,
-                            color: Colors.white,
-                          ))),
-                ),
-                const SizedBox(height: 15),
-                SizedBox(
-                  width: 800,
-                  height: 60,
-                  child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (context) => const Help()),
-                        );
-                      },
-                      child: const Text(
-                        '帮 助',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Colors.white,
-                        ),
-                      )),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    SizedBox(
-                      width:
-                          MediaQuery.of(context).size.width * 0.4, // 屏幕宽度的40%
-                      height: 60,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+                            child: const Text("连接热点",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.white,
+                                ))),
+                      ),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: 800,
+                        height: 60,
+                        child: ElevatedButton(
+                            onPressed: (MyWifi.connect_state || _isConnecting)
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      _isConnecting = true;
+                                    });
+                                    tts.TTS_speakText('正在连接设备');
+
+                                    // 分别处理连接，避免互相影响
+                                    try {
+                                      await MyWifi.connectAndCommunicate()
+                                          .timeout(const Duration(seconds: 5),
+                                              onTimeout: () {
+                                        print('摄像头连接超时');
+                                        return;
+                                      });
+                                    } catch (e) {
+                                      print('摄像头连接错误: $e');
+                                    }
+
+                                    try {
+                                      await MyRadar.connectAndCommunicate()
+                                          .timeout(const Duration(seconds: 5),
+                                              onTimeout: () {
+                                        print('雷达连接超时');
+                                        return;
+                                      });
+                                    } catch (e) {
+                                      print('雷达连接错误: $e');
+                                    }
+
+                                    // 检查连接状态并播报
+                                    if (MyWifi.connect_state &&
+                                        MyRadar.connectState) {
+                                      tts.TTS_speakText('摄像头和雷达均已连接');
+                                    } else if (MyWifi.connect_state) {
+                                      tts.TTS_speakText('仅摄像头已连接');
+                                    } else if (MyRadar.connectState) {
+                                      tts.TTS_speakText('仅雷达已连接');
+                                    } else {
+                                      tts.TTS_speakText('设备连接失败');
+                                    }
+
+                                    // 重置连接状态
+                                    if (mounted) {
+                                      setState(() {
+                                        _isConnecting = false;
+                                      });
+                                    }
+                                  },
+                            child:
+                                Text(_isConnecting ? "正在连接..." : "open my eyes",
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      color: Colors.white,
+                                    ))),
+                      ),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: 800,
+                        height: 60,
+                        child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (context) => const Help()),
+                              );
+                            },
+                            child: const Text(
+                              '帮 助',
+                              style: TextStyle(
+                                fontSize: 20,
+                                color: Colors.white,
+                              ),
+                            )),
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          SizedBox(
+                            width: MediaQuery.of(context).size.width *
+                                0.4, // 屏幕宽度的40%
+                            height: 60,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              onPressed: () {
+                                SystemNavigator.pop();
+                              },
+                              child: const Text(
+                                '退 出',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        onPressed: () {
-                          SystemNavigator.pop();
+                          SizedBox(
+                            width: MediaQuery.of(context).size.width *
+                                0.4, // 屏幕宽度的40%
+                            height: 60,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              onPressed: _saveCurrentImage,
+                              child: const Text(
+                                '解 读',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(15.0),
+                          ),
+                          alignment: Alignment.center,
+                          width: 1000,
+                          height: 50,
+                          child: Text(
+                            '雷达连接状态：${MyRadar.connectState ? '已连接' : '未连接'}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Colors.black,
+                            ),
+                          )),
+                      StreamBuilder<Map<String, dynamic>>(
+                        stream: MyRadar.obstacleStream,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData ||
+                              MyRadar.displayMatrix.isEmpty) {
+                            return Container(
+                              height: 150,
+                              color: Colors.grey[300],
+                              child: const Center(child: Text('等待雷达数据...')),
+                            );
+                          }
+
+                          return Container(
+                            height: 150,
+                            color: Colors.grey[300],
+                            child: Column(
+                              children: [
+                                const Text('雷达避障数据',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Expanded(
+                                  child: Column(
+                                    children: List.generate(
+                                      MyRadar.displayMatrix.length,
+                                      (row) => Expanded(
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceEvenly,
+                                          children: List.generate(
+                                            MyRadar.displayMatrix[row].length,
+                                            (col) {
+                                              int distance = MyRadar
+                                                  .displayMatrix[row][col];
+                                              // 获取当前格子的阈值
+                                              int threshold = 0;
+                                              if (row == 0)
+                                                threshold = 50; // 上行
+                                              else if (row == 1)
+                                                threshold = 100; // 中行
+                                              else
+                                                threshold = 150; // 下行
+
+                                              // 根据阈值设置颜色（只有红/绿两色）
+                                              Color color = distance < threshold
+                                                  ? Colors.red
+                                                  : Colors.green;
+
+                                              return Container(
+                                                width: 50,
+                                                height: 40,
+                                                decoration: BoxDecoration(
+                                                  color: color,
+                                                  borderRadius:
+                                                      BorderRadius.circular(5),
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    '$distance',
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
                         },
-                        child: const Text(
-                          '退 出',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.white,
-                          ),
-                        ),
                       ),
-                    ),
-                    SizedBox(
-                      width:
-                          MediaQuery.of(context).size.width * 0.4, // 屏幕宽度的40%
-                      height: 60,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                        ),
-                        onPressed: _saveCurrentImage,
-                        child: const Text(
-                          '解 读',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ],
-            )),
-      )),
-    ]));
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _saveCurrentImage() async {
@@ -491,14 +642,46 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         return "分析超时，请检查网络连接";
       });
 
-      // 处理长文本的分段播报
-      final segments = result.split('。');
-      for (final segment in segments) {
-        if (segment.trim().isNotEmpty) {
-          await tts.TTS_speakText(segment.trim());
+      // 确保在播报前停止其他播报
+      await tts.flutterTts.stop();
+
+      // 设置最高优先级标志
+      TtsService.HighestPriority = true;
+
+      // 按照AI返回的内容结构拆分回答（通常会按1. 2. 3.这样的格式返回）
+      List<String> contentParts = [];
+
+      // 尝试用序号分割
+      RegExp numbered = RegExp(r'\d+[\.\、]');
+      List<Match> matches = numbered.allMatches(result).toList();
+
+      if (matches.length >= 2) {
+        for (int i = 0; i < matches.length; i++) {
+          int start = matches[i].start;
+          int end =
+              (i < matches.length - 1) ? matches[i + 1].start : result.length;
+          contentParts.add(result.substring(start, end).trim());
+        }
+      } else {
+        // 如果没有清晰的序号，则按句号分割
+        contentParts =
+            result.split('。').where((s) => s.trim().isNotEmpty).toList();
+      }
+
+      // 播报每个部分
+      for (String part in contentParts) {
+        if (part.isNotEmpty) {
+          await tts.flutterTts.speak(part);
+          // 等待播报完成（根据文本长度估算时间）
+          await Future.delayed(
+              Duration(milliseconds: 200 + (part.length * 80)));
         }
       }
+
+      // 播报完成后释放最高优先级
+      TtsService.HighestPriority = false;
     } catch (e) {
+      TtsService.HighestPriority = false;
       print('图像处理失败: $e');
       tts.TTS_speakText('图片解读失败，请重试');
       ScaffoldMessenger.of(context).showSnackBar(

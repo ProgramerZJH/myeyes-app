@@ -33,6 +33,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0             # 代码规范检查
+  flutter_launcher_icons: ^0.13.1
+
+# flutter_launcher_icons配置应该在这里（与flutter:同级）
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon.png"
 
 flutter:
   assets:

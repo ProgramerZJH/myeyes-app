@@ -4,70 +4,65 @@
 #include <string>
 #include <algorithm>
 
-#pragma comment(lib, "ws2_32.lib")  // Winsock ¿â
+#pragma comment(lib, "ws2_32.lib")  // Winsock åº“
 
-#define SERVER_IP "192.168.37.33"  // ·şÎñ¶ËIPµØÖ·
-#define SERVER_PORT 8082           // ·şÎñ¶Ë¶Ë¿Ú
-#define BUFFER_SIZE 1024           // Êı¾İ»º³åÇø´óĞ¡
-#define EXPECTED_DATA_SIZE 10022   // ÆÚÍû½ÓÊÕµ½µÄÊı¾İ´óĞ¡£¨°üÀ¨°üÍ·¡¢°ü³¤¶ÈµÈ£©
+#define SERVER_IP "192.168.37.33"  // æœåŠ¡ç«¯IPåœ°å€
+#define SERVER_PORT 8082           // æœåŠ¡ç«¯ç«¯å£
+#define BUFFER_SIZE 1024           // æ•°æ®ç¼“å†²åŒºå¤§å°
+#define EXPECTED_DATA_SIZE 646     // æœŸæœ›æ¥æ”¶åˆ°çš„æ•°æ®å¤§å°ï¼ˆ25x25 + åŒ…å¤´ç­‰ï¼‰
 
-// ÓÃÓÚ¼ÆËã¾àÀë£¬µ¥Î»ÎªºÁÃ×£¬Ö±½ÓÈ¡intÒòÎª½á¹û²»ÓÃºÜ¾«È·
+// ç”¨äºè®¡ç®—è·ç¦»ï¼Œå•ä½ä¸ºæ¯«ç±³ï¼Œç›´æ¥å–intå› ä¸ºç»“æœä¸ç”¨å¾ˆç²¾ç¡®
 int Distance(char byte) {
-    int decimalNum = static_cast<unsigned char>(byte);  // Ö±½Ó½«×Ö·û×ª»»ÎªÎŞ·ûºÅÕûĞÍ
-    return (decimalNum / 5.1) * (decimalNum / 5.1);  // ¼ÆËã¾àÀë
+    int decimalNum = static_cast<unsigned char>(byte);  // ç›´æ¥å°†å­—ç¬¦è½¬æ¢ä¸ºæ— ç¬¦å·æ•´å‹
+    return (decimalNum / 5.1) * (decimalNum / 5.1);  // è®¡ç®—è·ç¦»
 }
 
-
-// ±ÜÕÏº¯Êı£¬ÅĞ¶ÏÊÇ·ñÓĞÕÏ°­, Èç¹û·ÖÇøÄÚÓĞ³¬¹ı°Ù·ÖÖ®20µÄĞ¡ÓÚãĞÖµµÄµãÄÇÃ´¾Í»á±¨¾¯
+// é¿éšœå‡½æ•°ï¼Œåˆ¤æ–­æ˜¯å¦æœ‰éšœç¢, å¦‚æœåˆ†åŒºå†…æœ‰è¶…è¿‡ç™¾åˆ†ä¹‹20çš„å°äºé˜ˆå€¼çš„ç‚¹é‚£ä¹ˆå°±ä¼šæŠ¥è­¦
 bool AvoidObstacle(const std::vector<std::vector<int>>& distances, const int threshold[], int horizontal_parts, int vertical_parts) {
-    const int rows = 100, cols = 100;
+    const int rows = 25, cols = 25;
     const int h_part_size = cols / horizontal_parts, v_part_size = rows / vertical_parts;
 
     for (int v = 0; v < vertical_parts; ++v) {
         for (int h = 0; h < horizontal_parts; ++h) {
             std::vector<int> points;
 
-            // ²ÉÑù·ÖÇøÊı¾İ£¨¿ÉÓÅ»¯Îª¼ä¸ô²ÉÑù½µµÍ¼ÆËãÁ¿£©
+            // é‡‡æ ·åˆ†åŒºæ•°æ®ï¼ˆå¯ä¼˜åŒ–ä¸ºé—´éš”é‡‡æ ·é™ä½è®¡ç®—é‡ï¼‰
             for (int i = v * v_part_size; i < (v + 1) * v_part_size; ++i)
                 for (int j = h * h_part_size; j < (h + 1) * h_part_size; ++j) {
                     int dist = distances[i][j];
-                    if (dist != 0) {  // ¹ıÂËµôÖµÎª0µÄÊı¾İ
+                    if (dist != 0) {  // è¿‡æ»¤æ‰å€¼ä¸º0çš„æ•°æ®
                         points.push_back(dist);
                     }
                 }
 
-            if (points.empty()) continue;  // Èç¹ûÓĞĞ§Êı¾İÎª¿Õ£¬Ìø¹ı¸Ã·ÖÇø
+            if (points.empty()) continue;
 
-            // ÅÅĞòÊı¾İ
+            // æ’åºæ•°æ®
             std::sort(points.begin(), points.end());
 
-            // ¼ÆËãµÍ°Ù·ÖÖ®¶şÊ®µÄÊı¾İ
+            // è®¡ç®—ä½ç™¾åˆ†ä¹‹äºŒåçš„æ•°æ®
             int num_of_points = points.size();
-            int low_percentile_count = num_of_points / 5;  // 20% µÄÊı¾İ
+            int low_percentile_count = num_of_points / 5;
 
-            // ÌáÈ¡µÍ°Ù·ÖÖ®¶şÊ®µÄÊı¾İ
+            if (low_percentile_count == 0) continue;  // é˜²æ­¢é™¤ä»¥é›¶
+
+            // æå–ä½ç™¾åˆ†ä¹‹äºŒåçš„æ•°æ®
             std::vector<int> low_percentile_points(points.begin(), points.begin() + low_percentile_count);
 
-            // ¼ÆËãÕâĞ©µÍ°Ù·ÖÖ®¶şÊ®Êı¾İµÄÆ½¾ùÖµ
-            if (low_percentile_points.empty()) {
-                std::cout << "No valid data in the low 20% range for sector [" << v << "," << h << "]" << std::endl;
-                continue; // Èç¹ûÃ»ÓĞÊı¾İ£¬Ìø¹ı´Ë·ÖÇø
-            }
-
+            // è®¡ç®—è¿™äº›ä½ç™¾åˆ†ä¹‹äºŒåæ•°æ®çš„å¹³å‡å€¼
             double sum = 0;
             for (int val : low_percentile_points) {
                 sum += val;
             }
-            double avg = sum / low_percentile_points.size();
+            double avg = sum / low_percentile_count;
 
-            // »ñÈ¡µ±Ç°·ÖÇøµÄãĞÖµ
+            // è·å–å½“å‰åˆ†åŒºçš„é˜ˆå€¼
             int index = v * horizontal_parts + h;
-            int current_threshold = threshold[index];  // Ñ¡Ôñµ±Ç°·ÖÇø¶ÔÓ¦µÄãĞÖµ
+            int current_threshold = threshold[index];
 
-            // ´òÓ¡¼ÆËãµÄÆ½¾ùÖµ
-            std::cout << "Low 20% average in sector [" << v << "," << h << "]: " << avg << "mm, Threshold: " << current_threshold << "mm" << std::endl;
+            std::cout << "Low 20% average in sector [" << v << "," << h
+                      << "]: " << avg << "mm, Threshold: " << current_threshold << "mm" << std::endl;
 
-            // Èç¹ûµÍ°Ù·ÖÖ®¶şÊ®µÄÆ½¾ùÖµĞ¡ÓÚãĞÖµ£¬´¥·¢±¨¾¯
             if (avg < current_threshold) {
                 std::cout << "ALERT: Obstacle in sector [" << v << "," << h
                           << "] - Low 20% avg=" << avg << "mm\n";
@@ -82,27 +77,27 @@ int main() {
     WSADATA wsaData;
     SOCKET client_socket;
     struct sockaddr_in server_addr;
-    int threshold[12] = {700, 700, 700, 700, 700, 700, 700, 700, 1600, 1600, 1600, 1600};  // Ã¿¸ö·ÖÇøµÄãĞÖµ
+    int threshold[9] = {700, 700, 700, 700, 700, 700, 700, 700, 700};  // ä¿®æ”¹ä¸º3x3=9ä¸ªé˜ˆå€¼
 
-    // ³õÊ¼»¯ Winsock
+    // åˆå§‹åŒ– Winsock
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         std::cerr << "WSAStartup failed. Error Code: " << WSAGetLastError() << std::endl;
         return 1;
     }
 
-    // ´´½¨Ì×½Ó×Ö
+    // åˆ›å»ºå¥—æ¥å­—
     if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
         std::cerr << "Socket creation failed. Error Code: " << WSAGetLastError() << std::endl;
         WSACleanup();
         return 1;
     }
 
-    // ÅäÖÃ·şÎñ¶ËµØÖ·
+    // é…ç½®æœåŠ¡ç«¯åœ°å€
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(SERVER_PORT);
     server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 
-    // Á¬½Óµ½·şÎñ¶Ë
+    // è¿æ¥åˆ°æœåŠ¡ç«¯
     if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
         std::cerr << "Connection failed. Error Code: " << WSAGetLastError() << std::endl;
         closesocket(client_socket);
@@ -115,21 +110,17 @@ int main() {
     char buffer[BUFFER_SIZE];
     std::string received_data;
 
-    // ¶¨ÒåÒ»¸ö 100x100 µÄ¶şÎ¬ÏòÁ¿distances£¬ÓÃÀ´´æ´¢Êı¾İ
-    const int rows = 100;
-    const int cols = 100;
+    // å®šä¹‰ä¸€ä¸ª 25x25 çš„äºŒç»´å‘é‡distancesï¼Œç”¨æ¥å­˜å‚¨æ•°æ®
+    const int rows = 25;
+    const int cols = 25;
     std::vector<std::vector<int>> distances(rows, std::vector<int>(cols, 0));
 
-    // ±ÜÕÏãĞÖµ£¨µ¥Î»£ººÁÃ×£©
-    // ÕâÀïÃ¿¸ö·ÖÇøÓĞ²»Í¬µÄãĞÖµ£¬¿ÉÒÔ¸ù¾İÊµ¼ÊÇé¿öµ÷Õû
-    const int horizontal_parts = 4; // Ë®Æ½·ÖÇøÊı
-    const int vertical_parts = 3;   // ´¹Ö±·ÖÇøÊı
+    const int horizontal_parts = 3; // ä¿®æ”¹ä¸º3ä¸ªæ°´å¹³åˆ†åŒº
+    const int vertical_parts = 3;   // ä¿®æ”¹ä¸º3ä¸ªå‚ç›´åˆ†åŒº
 
     while (true) {
-        // Çå¿Õ½ÓÊÕ»º³åÇø
         received_data.clear();
 
-        // ½ÓÊÕÊı¾İÖ±µ½½ÓÊÕµ½×ã¹»µÄÊı¾İ
         while (received_data.size() < EXPECTED_DATA_SIZE) {
             int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0);
             if (bytes_received > 0) {
@@ -143,39 +134,30 @@ int main() {
             }
         }
 
-        // Èç¹û½ÓÊÕµ½µÄÊı¾İÁ¿ÒÑ¾­×ã¹»
         if (received_data.size() >= EXPECTED_DATA_SIZE) {
-            // »ñÈ¡°ü³¤¶È£¨2×Ö½Ú£©
             unsigned short package_length = (static_cast<unsigned char>(received_data[2]) << 8) |
                                             static_cast<unsigned char>(received_data[3]);
 
-            // Í¼ÏñÖ¡Êı¾İ¿ªÊ¼Î»ÖÃ£º16×Ö½Úºó
-            size_t image_frame_start = 4 + 16;  // °üÍ·£¨2×Ö½Ú£©+ °ü³¤¶È£¨2×Ö½Ú£©+ ÆäËûÄÚÈİ£¨16×Ö½Ú£©
+            size_t image_frame_start = 4 + 16;
+            std::string image_frame_data = received_data.substr(image_frame_start, package_length - 16 - 3);
 
-            // ÌáÈ¡Í¼ÏñÖ¡Êı¾İ
-            std::string image_frame_data = received_data.substr(image_frame_start, package_length - 16 - 3); // ¼õÈ¥°üÍ·£¨2×Ö½Ú£©ºÍ°üÎ²£¨1×Ö½Ú£©
-
-            // ¼ÆËã²¢´æ´¢Í¼ÏñÖ¡µÄÊı¾İµ½¶şÎ¬ÏòÁ¿
             size_t index = 0;
             for (int i = 0; i < rows; ++i) {
                 for (int j = 0; j < cols; ++j) {
                     if (index < image_frame_data.size()) {
-                        // ¼ÆËãÃ¿¸ö×Ö½ÚµÄ¾àÀë²¢´æÈë¶şÎ¬ÏòÁ¿
                         distances[i][j] = Distance(image_frame_data[index]);
                         ++index;
                     }
                 }
             }
 
-            // ½øĞĞ±ÜÕÏÅĞ¶Ï
             if (AvoidObstacle(distances, threshold, horizontal_parts, vertical_parts)) {
                 std::cout << "Obstacle detected! Taking evasive action..." << std::endl;
-                // ÔÚÕâÀïÌí¼Ó±ÜÕÏ²ßÂÔ£¬ÀıÈçÍ£Ö¹¡¢×ªÏòµÈ
+                // é¿éšœç­–ç•¥ä»£ç ...
             } else {
                 std::cout << "No obstacle detected. Continuing..." << std::endl;
             }
 
-            // Çå¿Õ»º´æ£¬×¼±¸½ÓÊÕĞÂµÄÊı¾İ
             received_data.clear();
         } else {
             std::cerr << "Received data size less than expected, something went wrong!" << std::endl;
@@ -183,11 +165,7 @@ int main() {
         }
     }
 
-    // ¹Ø±ÕÌ×½Ó×Ö
     closesocket(client_socket);
-
-    // ÇåÀí Winsock
     WSACleanup();
-
     return 0;
 }

@@ -22,7 +22,7 @@
     <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS"/>
     <application
         android:name="${applicationName}"
-        android:label="myeyes"
+        android:label="Hear the Vision"
         android:allowNativeHeapPointerTagging="false"
         android:icon="@mipmap/ic_launcher">
         <activity
