@@ -5,7 +5,7 @@
 import 'package:flutter_tts/flutter_tts.dart';
 
 class TtsService {
-  double speed = 0.8;
+  double speed = 0.5;
   //唯一存在的实例变量   ↓↓↓↓↓
   static final TtsService _instance = TtsService._internal();
   FlutterTts flutterTts = FlutterTts();

@@ -17,12 +17,14 @@ class RadarClient {
   // 数据存储
   List<List<int>> distanceMatrix = []; // 原始25x25数据
   List<List<int>> displayMatrix = []; // UI显示用3x3数据
+  /*
   List<String> logMessages = [];
+  */
 
-  // 避障阈值（厘米）
-  final int closeThreshold = 50; // 紧急警告距离
-  final int nearThreshold = 100; // 警告距离
-  final int alertThreshold = 150; // 提醒距离
+  // 避障阈值（毫米）
+  final int closeThreshold = 500; // 紧急警告距离
+  final int nearThreshold = 1000; // 警告距离
+  final int alertThreshold = 1500; // 提醒距离
 
   // 方位定义（9个区域）
   final List<String> positions = [
@@ -55,19 +57,19 @@ class RadarClient {
       socket = await Socket.connect(ip, port, timeout: Duration(seconds: 5));
       socket!.setOption(SocketOption.tcpNoDelay, true);
       connectState = true;
-      addLog('已连接到雷达服务器');
+      //addLog('已连接到雷达服务器');
 
       socket!.listen(
         (data) => handleIncomingData(data),
         onError: (error) {
           print('雷达连接错误: $error');
-          addLog('雷达连接错误: $error');
+          //addLog('雷达连接错误: $error');
           reset();
           reconnect();
         },
         onDone: () {
           print('雷达服务器断开连接');
-          addLog('雷达服务器断开连接');
+          //addLog('雷达服务器断开连接');
           reset();
           reconnect();
         },
@@ -75,7 +77,7 @@ class RadarClient {
       );
     } catch (e) {
       print('雷达连接失败: $e');
-      addLog('雷达连接失败: $e');
+      //addLog('雷达连接失败: $e');
       connectState = false;
       await Future.delayed(Duration(seconds: 2));
       reconnect();
@@ -102,7 +104,7 @@ class RadarClient {
       });
     } catch (e) {
       print('雷达数据处理错误: $e');
-      addLog('雷达数据处理错误: $e');
+      //addLog('雷达数据处理错误: $e');
     }
   }
 
@@ -116,7 +118,7 @@ class RadarClient {
     try {
       // 检查数据包最小长度（对应EXPECTED_DATA_SIZE=646）
       if (data.length < 646) {
-        addLog('数据包长度不足: ${data.length}字节，期望646字节');
+        //addLog('数据包长度不足: ${data.length}字节，期望646字节');
         return distances;
       }
 
@@ -132,9 +134,9 @@ class RadarClient {
             int rawValue = data[index].toInt();
             int distance = ((rawValue / 5.1) * (rawValue / 5.1)).round();
 
-            // 限制有效距离为250厘米
-            if (distance > 250 || distance <= 0) {
-              distance = 250; // 超出范围设为最大值
+            // 限制有效距离为2500毫米
+            if (distance > 2500 || distance <= 0) {
+              distance = 2500; // 超出范围设为最大值
             }
 
             distances[i][j] = distance;
@@ -142,7 +144,7 @@ class RadarClient {
         }
       }
     } catch (e) {
-      addLog('雷达数据解析错误: $e');
+      //addLog('雷达数据解析错误: $e');
     }
 
     return distances;
@@ -203,11 +205,11 @@ class RadarClient {
     int horizontalParts = 3;
     int verticalParts = 3;
 
-    // 设置各区域阈值（根据要求，按行分别为50cm/100cm/150cm）
+    // 设置各区域阈值（根据要求，按行分别为500mm/1000mm/1500mm）
     List<int> thresholds = [
-      50, 50, 50, // 上三个区域阈值为50
-      100, 100, 100, // 中三个区域阈值为100
-      150, 150, 150 // 下三个区域阈值为150
+      500, 500, 500, // 上三个区域阈值为500
+      1000, 1000, 1000, // 中三个区域阈值为1000
+      1500, 1500, 1500 // 下三个区域阈值为1500
     ];
 
     int rows = distances.length;
@@ -227,7 +229,7 @@ class RadarClient {
           for (int j = h * colsPerPart;
               j < (h + 1) * colsPerPart && j < cols;
               j++) {
-            if (distances[i][j] > 0 && distances[i][j] < 250) {
+            if (distances[i][j] > 0 && distances[i][j] < 2500) {
               points.add(distances[i][j]);
             }
           }
@@ -314,7 +316,7 @@ class RadarClient {
   void disconnect() {
     socket?.close();
     connectState = false;
-    addLog('已断开雷达连接');
+    //addLog('已断开雷达连接');
   }
 
   /// 重新连接
@@ -327,16 +329,18 @@ class RadarClient {
   /// 设置新的IP地址
   void setIp(String newIp) {
     ip = newIp;
-    addLog('已更新雷达IP地址: $newIp');
+    //addLog('已更新雷达IP地址: $newIp');
   }
 
   /// 添加日志
+  /*
   void addLog(String message) {
     logMessages.add("[${DateTime.now().toString()}] $message");
     if (logMessages.length > 100) {
       logMessages.removeAt(0);
     }
   }
+  */
 
   /// 释放资源
   void dispose() {

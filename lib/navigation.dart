@@ -34,6 +34,9 @@ class _NavigationState extends State<Navigation> {
   final List<Polyline> _polylines = [];
   LatLng? _currentLatLng;
 
+  // 添加审图号相关状态
+  List<String> _approvalNumbers = [];
+
   @override
   void initState() {
     super.initState();
@@ -252,6 +255,23 @@ class _NavigationState extends State<Navigation> {
     }
   }
 
+  /// 获取审图号
+  void _getApprovalNumber() async {
+    try {
+      final mapContent = await _mapController.getMapContentApprovalNumber();
+      final satellite = await _mapController.getSatelliteImageApprovalNumber();
+
+      setState(() {
+        _approvalNumbers = [
+          if (mapContent.isNotEmpty == true) '审图号：$mapContent',
+          if (satellite.isNotEmpty == true) '卫星图审图号：$satellite'
+        ];
+      });
+    } catch (e) {
+      print('获取审图号失败: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -263,21 +283,54 @@ class _NavigationState extends State<Navigation> {
           // 地图容器
           Expanded(
             flex: 2,
-            child: AMapWidget(
-              onMapCreated: (controller) {
-                setState(() {
-                  _mapController = controller;
-                  if (_currentLatLng != null) {
-                    _updateCurrentMarker();
-                  }
-                });
-              },
-              markers: Set<Marker>.of(_markers),
-              polylines: Set<Polyline>.of(_polylines),
-              initialCameraPosition: CameraPosition(
-                target: _currentLatLng ?? const LatLng(39.90960, 116.397228),
-                zoom: 15,
-              ),
+            child: Stack(
+              children: [
+                AMapWidget(
+                  onMapCreated: (controller) {
+                    setState(() {
+                      _mapController = controller;
+                      if (_currentLatLng != null) {
+                        _updateCurrentMarker();
+                      }
+                      // 获取审图号
+                      _getApprovalNumber();
+                    });
+                  },
+                  compassEnabled: true,
+                  scaleEnabled: true,
+                  zoomGesturesEnabled: true,
+                  scrollGesturesEnabled: true,
+                  rotateGesturesEnabled: true,
+                  markers: Set<Marker>.of(_markers),
+                  polylines: Set<Polyline>.of(_polylines),
+                  initialCameraPosition: CameraPosition(
+                    target:
+                        _currentLatLng ?? const LatLng(39.90960, 116.397228),
+                    zoom: 15,
+                  ),
+                  myLocationStyleOptions: MyLocationStyleOptions(true),
+                ),
+                // 显示审图号
+                if (_approvalNumbers.isNotEmpty)
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _approvalNumbers
+                            .map((text) =>
+                                Text(text, style: TextStyle(fontSize: 12)))
+                            .toList(),
+                      ),
+                    ),
+                  )
+              ],
             ),
           ),
           // 搜索框

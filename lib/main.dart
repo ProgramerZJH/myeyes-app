@@ -1,17 +1,27 @@
 // 导入异步编程支持，提供Future、Stream等异步操作功能
 import 'dart:async';
 
-// 导入平台服务支持，用于调用原生平台API（如方法通道）
+import 'dart:convert';
+
+// 导入Flutter基础UI组件和服务
+import 'package:flutter/material.dart';
+
 import 'package:flutter/services.dart';
 
+// 导入平台服务支持，用于调用原生平台API（如方法通道）
+//import 'package:flutter/services.dart';
+
+// 导入Flutter基础UI组件
+//import 'package:flutter/material.dart';
+
+// 导入蓝牙功能
+import 'package:myeyes/BLE.dart';
+
 // 导入自定义的WiFi客户端类，处理网络连接和通信
-import 'wifi.dart';
+import 'package:myeyes/wifi.dart';
 
 // 导入自定义的文字转语音服务
 import 'package:myeyes/TTS.dart';
-
-// 导入Flutter基础UI组件
-import 'package:flutter/material.dart';
 
 // 导入应用设置插件，用于打开系统设置面板（如WiFi设置）
 //import 'package:app_settings/app_settings.dart';
@@ -26,12 +36,7 @@ import 'help.dart';
 import 'navigation.dart';
 
 import 'services/openai_service.dart';
-import 'dart:convert';
-/*
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-*/
+
 import 'package:x_amap_base/x_amap_base.dart';
 
 import 'package:amap_map/amap_map.dart';
@@ -51,7 +56,7 @@ void main() async {
     home: const MyApp(),
     debugShowCheckedModeBanner: false,
   ));
-  tts.TTS_speakText('My eyes 伴您安全出行');
+  tts.TTS_speakText('听见视界伴您出行');
 }
 
 //------------------------------构建主程序----------------------------------------
@@ -63,9 +68,21 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final BLEManager _bleManager = BLEManager();
+
   @override
   void initState() {
     super.initState();
+    _bleManager.initBluetooth();
+    _bleManager.setOnButtonPressedCallback(() {
+      _triggerImageAnalysis();
+    });
+  }
+
+  @override
+  void dispose() {
+    _bleManager.dispose();
+    super.dispose();
   }
 
   @override
@@ -116,35 +133,10 @@ class _MyAppState extends State<MyApp> {
                 child: IconButton(
                   padding: EdgeInsets.zero,
                   onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          title: const Text('通信日志'),
-                          content: SizedBox(
-                            width: double.maxFinite,
-                            child: ListView.builder(
-                              itemCount: MyWifi.logMessages.length,
-                              itemBuilder: (context, index) {
-                                return Text(
-                                  MyWifi.logMessages[index],
-                                  style: const TextStyle(fontSize: 12),
-                                );
-                              },
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('关闭'),
-                            ),
-                          ],
-                        );
-                      },
-                    );
+                    _bleManager.requestBluetoothPermissions(context);
                   },
                   icon: const Icon(
-                    Icons.list,
+                    Icons.bluetooth,
                     color: Colors.grey,
                     size: 20,
                   ),
@@ -264,6 +256,23 @@ class _MyAppState extends State<MyApp> {
       },
     );
   }
+
+  // 触发图像解读功能
+  void _triggerImageAnalysis() {
+    // 使用全局key获取MyHomePageState实例
+    final homePageState = MyHomePageState.globalKey.currentState;
+
+    if (homePageState != null) {
+      homePageState._saveCurrentImage();
+    } else {
+      print('无法获取MyHomePageState实例');
+    }
+  }
+
+  // 获取Navigator的context - 这个方法现在简化为直接返回当前context
+  BuildContext getKeyContext() {
+    return context;
+  }
 }
 
 //----------------------------构建主页面------------------------------------------
@@ -276,6 +285,10 @@ class MyHomePage extends StatefulWidget {
 
 //-----------------------------主页面示内容--------------------------------------
 class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
+  // 添加全局key以便外部访问
+  static final GlobalKey<MyHomePageState> globalKey =
+      GlobalKey<MyHomePageState>();
+
   TtsService mytts = TtsService();
 
   bool _previousConnectState = false; // 添加变量跟踪之前的连接状态
@@ -324,6 +337,8 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // 添加key
+      key: MyHomePageState.globalKey,
       body: SingleChildScrollView(
         // 添加滚动视图
         child: Column(

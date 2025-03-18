@@ -58,7 +58,10 @@ class WiFiClient {
   Function? refreash;
 
   // 存储日志消息的列表
+  // 注释掉日志相关逻辑
+  /*
   List<String> logMessages = [];
+  */
 
   // 添加图像显示控制器
   final StreamController<Uint8List> imageStreamController =
@@ -121,7 +124,7 @@ class WiFiClient {
         _isProcessing = false;
       }
     } catch (e) {
-      addLog('数据处理错误: $e');
+      //addLog('数据处理错误: $e');
       _resetState();
     }
   }
@@ -154,7 +157,7 @@ class WiFiClient {
   }
 
   /// 添加日志记录
-  /// [message] 日志消息内容
+  /*
   void addLog(String message) {
     logMessages.add("[${DateTime.now().toString()}] $message");
     // 保持最新的100条记录
@@ -162,6 +165,7 @@ class WiFiClient {
       logMessages.removeAt(0);
     }
   }
+  */
 
   // 在不需要时释放资源
   void dispose() {
@@ -215,7 +219,7 @@ class WiFiClient {
       if (data.length == 4 && !isReceivingImage) {
         expectedImageSize =
             ByteData.view(data.buffer).getUint32(0, Endian.little);
-        addLog('预期图片大小: $expectedImageSize 字节');
+        //addLog('预期图片大小: $expectedImageSize 字节');
         currentImageData = Uint8List(0);
         isReceivingImage = true;
       }
@@ -223,11 +227,11 @@ class WiFiClient {
       else if (isReceivingImage) {
         // 将新接收的数据追加到当前图像数据中
         currentImageData = Uint8List.fromList([...currentImageData, ...data]);
-        addLog('当前接收数据长度: ${currentImageData.length} 字节');
+        //addLog('当前接收数据长度: ${currentImageData.length} 字节');
 
         if (currentImageData.length >= expectedImageSize) {
           isReceivingImage = false;
-          addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
+          //addLog('图片接收完成！总大小: ${currentImageData.length} 字节');
 
           // 如果数据大小正确且未在处理中，则开始处理图像
           if (currentImageData.length == expectedImageSize &&
@@ -249,7 +253,7 @@ class WiFiClient {
                   // 通过 Stream 发送图像数据
                   imageStreamController.add(encodedBytes);
                   processedImageData = encodedBytes;
-                  addLog('图像处理成功');
+                  //addLog('图像处理成功');
                 } else {
                   processedImageData = currentImageData;
                 }
@@ -257,7 +261,7 @@ class WiFiClient {
                 // 释放OpenCV资源
                 mat.dispose();
               } catch (e) {
-                addLog('OpenCV处理错误: $e');
+                //addLog('OpenCV处理错误: $e');
                 processedImageData = currentImageData;
               }
 
@@ -266,7 +270,7 @@ class WiFiClient {
                 refreash!();
               }
             } catch (e) {
-              addLog('处理图像时发生错误: $e');
+              //addLog('处理图像时发生错误: $e');
             } finally {
               isProcessingImage = false;
             }
@@ -279,7 +283,7 @@ class WiFiClient {
       }
     } catch (e) {
       // 发生错误时重置所有状态
-      addLog('数据处理错误: $e');
+      //addLog('数据处理错误: $e');
       isReceivingImage = false;
       isProcessingImage = false;
       currentImageData = Uint8List(0);

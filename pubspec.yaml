@@ -22,12 +22,13 @@ dependencies:
   dio: ^5.4.0                       # 网络请求客户端
   http: ^1.1.0                      # HTTP请求
   cupertino_icons: ^1.0.2           # iOS风格图标 
-  amap_map: ^1.0.12
+  amap_map: ^1.0.12                  # 使用确切版本号
   openai_dart: ^0.4.5
   
   opencv_dart: ^1.4.1               # OpenCV图像处理
   url_launcher: ^6.3.0
   shared_preferences: ^2.2.2 # 用于存储隐私协议状态
+  flutter_blue_plus: ^1.5.2  # 添加蓝牙通信库
 
 dev_dependencies:
   flutter_test:
