@@ -1,324 +1,259 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter/services.dart';
-import 'package:myeyes/TTS.dart';
-import 'dart:async';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:myeyes/main.dart'; // 导入全局变量tts
 
 class BLEManager {
-  static final BLEManager _instance = BLEManager._internal();
-  factory BLEManager() => _instance;
-  BLEManager._internal();
+  // 存储已发现的设备
+  List<BluetoothDevice> discoveredDevices = [];
 
-  BluetoothDevice? _connectedDevice;
-  // ignore: unused_field
-  BluetoothCharacteristic? _characteristic;
-  bool _isScanning = false;
-  List<BluetoothDevice> _discoveredDevices = [];
-  StreamSubscription<List<ScanResult>>? _scanSubscription;
-  StreamSubscription<BluetoothConnectionState>? _deviceStateSubscription;
-  final TtsService tts = TtsService();
+  // 已连接的设备
+  BluetoothDevice? connectedDevice;
 
-  // 获取当前连接状态
-  bool get isConnected => _connectedDevice != null;
-  bool get isScanning => _isScanning;
-  set isScanning(bool value) => _isScanning = value;
-  List<BluetoothDevice> get discoveredDevices => _discoveredDevices;
-  BluetoothDevice? get connectedDevice => _connectedDevice;
+  // 通知特征
+  BluetoothCharacteristic? notifyCharacteristic;
+
+  // 设备连接状态
+  bool isConnected = false;
+
+  // 设备扫描状态
+  bool isScanning = false;
+
+  // 按钮按下回调
+  VoidCallback? onButtonPressed;
+
+  // 服务和特征UUID (与BLE.cpp中定义的相同)
+  final String SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+  final String CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
   // 初始化蓝牙
   Future<void> initBluetooth() async {
+    // 检查蓝牙是否可用
     try {
-      final isSupported = await FlutterBluePlus.isSupported;
-      if (!isSupported) {
-        print('设备不支持蓝牙');
-        return;
-      }
-
       // 监听蓝牙状态变化
       FlutterBluePlus.adapterState.listen((state) {
         if (state == BluetoothAdapterState.on) {
-          print('蓝牙已启用');
-        } else {
-          print('蓝牙未启用');
-          _connectedDevice = null;
+          print('蓝牙已打开');
+        } else if (state == BluetoothAdapterState.off) {
+          print('蓝牙已关闭');
+          isConnected = false;
+          connectedDevice = null;
         }
       });
     } catch (e) {
-      print('蓝牙初始化失败: $e');
+      print('初始化蓝牙出错: $e');
     }
-  }
-
-  // 开始扫描设备
-  Future<void> startScan(StateSetter setState) async {
-    if (_isScanning) return;
-
-    _discoveredDevices.clear();
-    _isScanning = true;
-
-    try {
-      // 确保蓝牙已开启
-      if (await FlutterBluePlus.adapterState.first ==
-          BluetoothAdapterState.on) {
-        _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-          for (ScanResult result in results) {
-            if (!_discoveredDevices.contains(result.device) &&
-                result.device.platformName.isNotEmpty) {
-              setState(() {
-                _discoveredDevices.add(result.device);
-              });
-            }
-          }
-        });
-
-        await FlutterBluePlus.startScan(
-          timeout: const Duration(seconds: 10),
-          androidUsesFineLocation: false,
-        );
-      } else {
-        print('蓝牙未开启');
-        tts.TTS_speakText('请先开启蓝牙');
-      }
-    } catch (e) {
-      print('扫描失败: $e');
-      tts.TTS_speakText('蓝牙扫描失败');
-    }
-
-    _isScanning = false;
-  }
-
-  // 停止扫描
-  void stopScan() {
-    _scanSubscription?.cancel();
-    FlutterBluePlus.stopScan();
-    _isScanning = false;
-  }
-
-  // 连接到设备
-  Future<void> connectToDevice(BluetoothDevice device) async {
-    try {
-      await device.connect(autoConnect: false).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          tts.TTS_speakText('导盲杖快捷键连接超时');
-          device.disconnect();
-          throw Exception('连接超时');
-        },
-      );
-
-      _connectedDevice = device;
-      tts.TTS_speakText('导盲杖快捷键连接成功');
-
-      _deviceStateSubscription = device.connectionState.listen((state) {
-        if (state == BluetoothConnectionState.disconnected) {
-          _connectedDevice = null;
-          _characteristic = null;
-          tts.TTS_speakText('导盲杖快捷键连接已断开');
-        }
-      });
-
-      await _discoverServicesAndListen(device);
-    } catch (e) {
-      print('连接失败: $e');
-      tts.TTS_speakText('导盲杖快捷键连接失败');
-      device.disconnect();
-    }
-  }
-
-  // 断开连接
-  void disconnectFromDevice() {
-    if (_connectedDevice != null) {
-      _connectedDevice!.disconnect();
-      _deviceStateSubscription?.cancel();
-      _connectedDevice = null;
-      _characteristic = null;
-      tts.TTS_speakText('导盲杖快捷键连接已断开');
-    }
-  }
-
-  // 发现服务和特征
-  Future<void> _discoverServicesAndListen(BluetoothDevice device) async {
-    try {
-      List<BluetoothService> services = await device.discoverServices();
-
-      for (BluetoothService service in services) {
-        for (BluetoothCharacteristic characteristic
-            in service.characteristics) {
-          if (characteristic.properties.notify) {
-            _characteristic = characteristic;
-
-            await characteristic.setNotifyValue(true);
-
-            characteristic.lastValueStream.listen((value) {
-              if (value.isNotEmpty) {
-                String message = String.fromCharCodes(value);
-                print('收到消息: $message');
-
-                if (message.contains('Black Button pressed')) {
-                  // 触发回调
-                  if (_onButtonPressed != null) {
-                    _onButtonPressed!();
-                  }
-                }
-              }
-            });
-
-            print('已设置特征值通知: ${characteristic.uuid}');
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      print('发现服务失败: $e');
-    }
-  }
-
-  // 按钮按下的回调函数
-  Function? _onButtonPressed;
-  void setOnButtonPressedCallback(Function callback) {
-    _onButtonPressed = callback;
   }
 
   // 请求蓝牙权限
   Future<void> requestBluetoothPermissions(BuildContext context) async {
-    const platform = MethodChannel('com.example.myeyes/bluetooth');
-    bool hasPermissions = false;
+    // 请求必要的权限
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.bluetooth,
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.location,
+    ].request();
 
-    try {
-      hasPermissions = await platform.invokeMethod('checkBluetoothPermissions');
-    } catch (e) {
-      print('检查蓝牙权限失败: $e');
+    // 检查权限是否被授予
+    if (statuses[Permission.bluetoothConnect]!.isGranted &&
+        statuses[Permission.bluetoothScan]!.isGranted &&
+        statuses[Permission.location]!.isGranted) {
+      // 开始扫描设备
+      await startScan(context);
+    } else {
+      // 显示权限被拒绝的提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('需要蓝牙和位置权限才能搜索设备')),
+      );
+    }
+  }
+
+  // 开始扫描蓝牙设备
+  Future<void> startScan(BuildContext context) async {
+    // 清空之前发现的设备
+    discoveredDevices.clear();
+
+    // 检查蓝牙是否已打开
+    BluetoothAdapterState state = await FlutterBluePlus.adapterState.first;
+    if (state != BluetoothAdapterState.on) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请打开蓝牙')),
+      );
+      return;
     }
 
-    if (!hasPermissions) {
+    // 如果已连接，返回
+    if (isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已有设备连接')),
+      );
+      return;
+    }
+
+    // 如果正在扫描，返回
+    if (isScanning) {
+      return;
+    }
+
+    // 设置扫描状态
+    isScanning = true;
+
+    // 显示扫描中的提示
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('正在扫描设备...')),
+    );
+
+    // 开始扫描
+    try {
+      // 扫描10秒
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+
+      // 处理扫描结果
+      FlutterBluePlus.scanResults.listen((results) {
+        for (ScanResult result in results) {
+          if (result.device.name.contains('TingJian BLE')) {
+            // 找到目标设备
+            if (!discoveredDevices.contains(result.device)) {
+              discoveredDevices.add(result.device);
+              // 自动连接到第一个找到的目标设备
+              connectToDevice(context, result.device);
+              break;
+            }
+          }
+        }
+      });
+
+      // 扫描完成后更新状态
+      await Future.delayed(const Duration(seconds: 10));
+      isScanning = false;
+
+      // 如果未找到设备
+      if (discoveredDevices.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未找到听见BLE设备')),
+        );
+      }
+    } catch (e) {
+      isScanning = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('扫描出错: $e')),
+      );
+    }
+  }
+
+  // 连接到设备
+  Future<void> connectToDevice(
+      BuildContext context, BluetoothDevice device) async {
+    try {
+      // 停止扫描
+      await FlutterBluePlus.stopScan();
+
+      // 显示连接提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('正在连接到 ${device.name}...')),
+      );
+
+      // 连接到设备
+      await device.connect(autoConnect: false).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception("连接超时");
+        },
+      );
+
+      // 更新连接状态
+      isConnected = true;
+      connectedDevice = device;
+
+      // 显示连接成功提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已连接到 ${device.name}')),
+      );
+
+      // 播放TTS提示
+      await TTS_speakText('已连接到蓝牙设备');
+
+      // 获取设备的服务
+      List<BluetoothService> services = await device.discoverServices();
+
+      // 寻找目标服务和特征
+      for (BluetoothService service in services) {
+        if (service.uuid.toString() == SERVICE_UUID) {
+          for (BluetoothCharacteristic characteristic
+              in service.characteristics) {
+            if (characteristic.uuid.toString() == CHARACTERISTIC_UUID) {
+              notifyCharacteristic = characteristic;
+
+              // 开启通知
+              await characteristic.setNotifyValue(true);
+
+              // 监听特征值变化
+              characteristic.value.listen((value) {
+                if (value.isNotEmpty) {
+                  // 将字节数组转换为字符串
+                  String message = String.fromCharCodes(value);
+                  print('蓝牙收到消息: $message');
+
+                  // 检查消息是否包含关键词，而不是完全匹配
+                  if (message.contains("Black")) {
+                    print('识别到按钮按下消息，触发解读功能');
+                    // 如果设置了按钮按下回调，则触发
+                    if (onButtonPressed != null) {
+                      onButtonPressed!();
+                    }
+                  }
+                }
+              });
+
+              break;
+            }
+          }
+          break;
+        }
+      }
+    } catch (e) {
+      isConnected = false;
+      connectedDevice = null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('连接失败: $e')),
+      );
+      await TTS_speakText('蓝牙连接失败');
+    }
+  }
+
+  // 断开连接
+  Future<void> disconnect() async {
+    if (connectedDevice != null) {
       try {
-        await platform.invokeMethod('requestBluetoothPermissions');
-        await Future.delayed(const Duration(seconds: 1));
-        hasPermissions =
-            await platform.invokeMethod('checkBluetoothPermissions');
+        await connectedDevice!.disconnect();
+        isConnected = false;
+        connectedDevice = null;
+        notifyCharacteristic = null;
       } catch (e) {
-        print('请求蓝牙权限失败: $e');
+        print('断开连接出错: $e');
       }
     }
+  }
 
-    if (hasPermissions) {
-      showBluetoothDevicesList(context);
-    } else {
-      _showPermissionDialog(context);
+  // 设置按钮按下回调
+  void setOnButtonPressedCallback(VoidCallback callback) {
+    onButtonPressed = callback;
+  }
+
+  // 播放TTS提示
+  Future<void> TTS_speakText(String text) async {
+    // 使用main.dart中导入的全局TTS服务播放提示
+    try {
+      await tts.TTS_speakText(text);
+    } catch (e) {
+      print('TTS播放失败: $e');
     }
-  }
-
-  // 显示权限对话框
-  void _showPermissionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('需要蓝牙权限'),
-          content: const Text('请授予应用蓝牙权限以连接导盲杖快捷键'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                const platform = MethodChannel('com.example.myeyes/bluetooth');
-                try {
-                  await platform.invokeMethod('openBluetoothSettings');
-                } catch (e) {
-                  print('打开蓝牙设置失败: $e');
-                }
-              },
-              child: const Text('去设置'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // 显示蓝牙设备列表
-  void showBluetoothDevicesList(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('蓝牙连接'),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 300,
-            child: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_isScanning ? '正在扫描...' : '可用设备'),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (_isScanning) {
-                              stopScan();
-                            } else {
-                              startScan(setState);
-                            }
-                            setState(() {});
-                          },
-                          child: Text(_isScanning ? '停止' : '扫描'),
-                        ),
-                      ],
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _discoveredDevices.length,
-                        itemBuilder: (context, index) {
-                          final device = _discoveredDevices[index];
-                          final isConnected =
-                              _connectedDevice?.remoteId == device.remoteId;
-                          return ListTile(
-                            title: Text(device.platformName.isEmpty
-                                ? '未知设备'
-                                : device.platformName),
-                            subtitle: Text(device.remoteId.str),
-                            trailing: isConnected
-                                ? const Icon(Icons.bluetooth_connected,
-                                    color: Colors.green)
-                                : const Icon(Icons.bluetooth),
-                            onTap: () {
-                              if (isConnected) {
-                                disconnectFromDevice();
-                              } else {
-                                connectToDevice(device);
-                              }
-                              Navigator.of(context).pop();
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('关闭'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   // 释放资源
   void dispose() {
-    stopScan();
-    disconnectFromDevice();
-    _scanSubscription?.cancel();
-    _deviceStateSubscription?.cancel();
+    disconnect();
   }
 }

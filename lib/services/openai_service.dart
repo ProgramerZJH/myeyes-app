@@ -21,10 +21,11 @@ class OpenAIService {
             ChatCompletionMessage.user(
               content: ChatCompletionUserMessageContent.parts([
                 ChatCompletionMessageContentPart.text(
-                  text: "请用中文详细描述这张图片的内容，注意包含以下要素："
-                      "1. 主要物体及其位置关系\n"
-                      "2. 文字内容（如果有）\n"
-                      "3. 可能存在的潜在危险",
+                  text: "请用中文详细描述这张图片的内容，尽可能完整地提供以下信息："
+                      "1. 场景概述和主要物体\n"
+                      "2. 场景中的文字内容（如果有）\n"
+                      "3. 可能存在的危险或障碍物\n"
+                      "4. 适合盲人理解的空间关系描述",
                 ),
                 ChatCompletionMessageContentPart.image(
                   imageUrl: ChatCompletionMessageImageUrl(
@@ -35,7 +36,7 @@ class OpenAIService {
             ),
           ],
           temperature: 0.2,
-          maxTokens: 5000,
+          maxTokens: 2000,
         ),
       );
       return res.choices.first.message.content ?? "未获取到描述内容";

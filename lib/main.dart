@@ -579,11 +579,11 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                               // 获取当前格子的阈值
                                               int threshold = 0;
                                               if (row == 0)
-                                                threshold = 50; // 上行
+                                                threshold = 500; // 上行
                                               else if (row == 1)
-                                                threshold = 100; // 中行
+                                                threshold = 1000; // 中行
                                               else
-                                                threshold = 150; // 下行
+                                                threshold = 1500; // 下行
 
                                               // 根据阈值设置颜色（只有红/绿两色）
                                               Color color = distance < threshold
@@ -657,46 +657,9 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         return "分析超时，请检查网络连接";
       });
 
-      // 确保在播报前停止其他播报
-      await tts.flutterTts.stop();
-
-      // 设置最高优先级标志
-      TtsService.HighestPriority = true;
-
-      // 按照AI返回的内容结构拆分回答（通常会按1. 2. 3.这样的格式返回）
-      List<String> contentParts = [];
-
-      // 尝试用序号分割
-      RegExp numbered = RegExp(r'\d+[\.\、]');
-      List<Match> matches = numbered.allMatches(result).toList();
-
-      if (matches.length >= 2) {
-        for (int i = 0; i < matches.length; i++) {
-          int start = matches[i].start;
-          int end =
-              (i < matches.length - 1) ? matches[i + 1].start : result.length;
-          contentParts.add(result.substring(start, end).trim());
-        }
-      } else {
-        // 如果没有清晰的序号，则按句号分割
-        contentParts =
-            result.split('。').where((s) => s.trim().isNotEmpty).toList();
-      }
-
-      // 播报每个部分
-      for (String part in contentParts) {
-        if (part.isNotEmpty) {
-          await tts.flutterTts.speak(part);
-          // 等待播报完成（根据文本长度估算时间）
-          await Future.delayed(
-              Duration(milliseconds: 200 + (part.length * 80)));
-        }
-      }
-
-      // 播报完成后释放最高优先级
-      TtsService.HighestPriority = false;
+      // 使用最高优先级播报完整文本，确保不被其他语音打断
+      await tts.TTS_speakHighestPriorityText(result);
     } catch (e) {
-      TtsService.HighestPriority = false;
       print('图像处理失败: $e');
       tts.TTS_speakText('图片解读失败，请重试');
       ScaffoldMessenger.of(context).showSnackBar(

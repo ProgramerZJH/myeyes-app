@@ -35,7 +35,7 @@ class _NavigationState extends State<Navigation> {
   LatLng? _currentLatLng;
 
   // 添加审图号相关状态
-  List<String> _approvalNumbers = [];
+  //List<String> _approvalNumbers = [];
 
   @override
   void initState() {
@@ -255,22 +255,40 @@ class _NavigationState extends State<Navigation> {
     }
   }
 
-  /// 获取审图号
+  // 获取审图号
+  /*
   void _getApprovalNumber() async {
     try {
-      final mapContent = await _mapController.getMapContentApprovalNumber();
-      final satellite = await _mapController.getSatelliteImageApprovalNumber();
+      // 尝试使用try-catch包装每个可能的API调用，防止某个方法不存在导致整个应用崩溃
+      String mapContent = "";
+      String satellite = "";
 
-      setState(() {
-        _approvalNumbers = [
-          if (mapContent.isNotEmpty == true) '审图号：$mapContent',
-          if (satellite.isNotEmpty == true) '卫星图审图号：$satellite'
-        ];
-      });
+      try {
+        mapContent = await _mapController.getMapContentApprovalNumber();
+      } catch (e) {
+        print('获取地图内容审图号失败: $e');
+      }
+
+      try {
+        satellite = await _mapController.getSatelliteImageApprovalNumber();
+      } catch (e) {
+        print('获取卫星图审图号失败: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _approvalNumbers = [
+            if (mapContent.isNotEmpty) '审图号：$mapContent',
+            if (satellite.isNotEmpty) '卫星图审图号：$satellite'
+          ];
+        });
+      }
     } catch (e) {
-      print('获取审图号失败: $e');
+      print('获取审图号总体失败: $e');
+      // 防止因为审图号崩溃影响整个应用
     }
   }
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -292,15 +310,23 @@ class _NavigationState extends State<Navigation> {
                       if (_currentLatLng != null) {
                         _updateCurrentMarker();
                       }
-                      // 获取审图号
-                      _getApprovalNumber();
+                      // 尝试获取审图号，但不影响地图主要功能
+                      /*
+                      try {
+                        _getApprovalNumber();
+                      } catch (e) {
+                        print('审图号初始化失败: $e');
+                      }
+                      */
                     });
                   },
+                  /*
                   compassEnabled: true,
                   scaleEnabled: true,
                   zoomGesturesEnabled: true,
                   scrollGesturesEnabled: true,
                   rotateGesturesEnabled: true,
+                  */
                   markers: Set<Marker>.of(_markers),
                   polylines: Set<Polyline>.of(_polylines),
                   initialCameraPosition: CameraPosition(
@@ -308,15 +334,16 @@ class _NavigationState extends State<Navigation> {
                         _currentLatLng ?? const LatLng(39.90960, 116.397228),
                     zoom: 15,
                   ),
-                  myLocationStyleOptions: MyLocationStyleOptions(true),
+                  //myLocationStyleOptions: MyLocationStyleOptions(true),
                 ),
                 // 显示审图号
+                /*
                 if (_approvalNumbers.isNotEmpty)
                   Positioned(
                     right: 10,
                     bottom: 10,
                     child: Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(4),
@@ -324,12 +351,13 @@ class _NavigationState extends State<Navigation> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: _approvalNumbers
-                            .map((text) =>
-                                Text(text, style: TextStyle(fontSize: 12)))
+                            .map((text) => Text(text,
+                                style: const TextStyle(fontSize: 12)))
                             .toList(),
                       ),
                     ),
                   )
+                */
               ],
             ),
           ),
