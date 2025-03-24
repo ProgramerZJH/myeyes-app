@@ -197,7 +197,7 @@ class BLEManager {
                   print('蓝牙收到消息: $message');
 
                   // 检查消息是否包含关键词，而不是完全匹配
-                  if (message.contains("Black")) {
+                  if (message.contains("AAA")) {
                     print('识别到按钮按下消息，触发解读功能');
                     // 如果设置了按钮按下回调，则触发
                     if (onButtonPressed != null) {

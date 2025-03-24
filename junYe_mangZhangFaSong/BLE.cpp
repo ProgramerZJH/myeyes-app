@@ -92,7 +92,7 @@ void loop()
 
       if (buttonState == HIGH)
       { // 仅在按下上升沿触发
-        String data = "Black Button pressed!";
+        String data = "AAA";
         pCharacteristic->setValue(data.c_str());
         pCharacteristic->notify();
         Serial.println("发送通知: " + data);

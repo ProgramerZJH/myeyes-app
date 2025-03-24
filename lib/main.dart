@@ -266,6 +266,52 @@ class _MyAppState extends State<MyApp> {
       homePageState._saveCurrentImage();
     } else {
       print('无法获取MyHomePageState实例');
+
+      // 新增：使用延迟尝试再次获取实例(避免出现组件树已重建但GlobalKey引用未更新的情况)
+      Future.delayed(const Duration(milliseconds: 100), () {
+        final retryState = MyHomePageState.globalKey.currentState;
+        if (retryState != null) {
+          print('延迟后成功获取到MyHomePageState实例');
+          retryState._saveCurrentImage();
+        } else {
+          print('延迟后仍无法获取MyHomePageState实例，尝试直接处理图像');
+
+          // 直接处理图像的备用方案
+          _processFallbackImage();
+        }
+      });
+    }
+  }
+
+  // 新增：备用图像处理方法(CV大法好,💩山代码发力了!!!)
+  Future<void> _processFallbackImage() async {
+    if (MyWifi.getCurrentImage().isEmpty) {
+      print('备用方法：没有可用的图像');
+      tts.TTS_speakText('没有可用的图像');
+      return;
+    }
+
+    try {
+      print('备用方法：开始处理图像');
+      Uint8List image = MyWifi.getCurrentImage();
+      final openAIService = OpenAIService();
+      final base64Image = base64Encode(image);
+
+      // 添加加载状态提示
+      tts.TTS_speakText('图片分析中，请稍候');
+
+      final result = await openAIService
+          .analyzeImage(base64Image)
+          .timeout(const Duration(seconds: 30), onTimeout: () {
+        return "分析超时，请检查网络连接";
+      });
+
+      // 使用最高优先级播报完整文本
+      await tts.TTS_speakHighestPriorityText(result);
+      print('备用方法：图像处理完成');
+    } catch (e) {
+      print('备用方法：图像处理失败: $e');
+      tts.TTS_speakText('图片解读失败，请重试');
     }
   }
 
@@ -633,6 +679,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     );
   }
 
+  //💩山代码的父亲
   Future<void> _saveCurrentImage() async {
     if (MyWifi.getCurrentImage().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
