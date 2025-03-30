@@ -1,11 +1,11 @@
 // 导入异步编程支持，提供Future、Stream等异步操作功能
 import 'dart:async';
-
 import 'dart:convert';
+//import 'dart:io';
+//import 'dart:typed_data';
 
 // 导入Flutter基础UI组件和服务
 import 'package:flutter/material.dart';
-
 import 'package:flutter/services.dart';
 
 // 导入平台服务支持，用于调用原生平台API（如方法通道）
@@ -38,7 +38,6 @@ import 'navigation.dart';
 import 'services/openai_service.dart';
 
 import 'package:x_amap_base/x_amap_base.dart';
-
 import 'package:amap_map/amap_map.dart';
 
 // 在文件顶部添加雷达客户端导入
@@ -259,31 +258,11 @@ class _MyAppState extends State<MyApp> {
 
   // 触发图像解读功能
   void _triggerImageAnalysis() {
-    // 使用全局key获取MyHomePageState实例
-    final homePageState = MyHomePageState.globalKey.currentState;
-
-    if (homePageState != null) {
-      homePageState._saveCurrentImage();
-    } else {
-      print('无法获取MyHomePageState实例');
-
-      // 新增：使用延迟尝试再次获取实例(避免出现组件树已重建但GlobalKey引用未更新的情况)
-      Future.delayed(const Duration(milliseconds: 100), () {
-        final retryState = MyHomePageState.globalKey.currentState;
-        if (retryState != null) {
-          print('延迟后成功获取到MyHomePageState实例');
-          retryState._saveCurrentImage();
-        } else {
-          print('延迟后仍无法获取MyHomePageState实例，尝试直接处理图像');
-
-          // 直接处理图像的备用方案
-          _processFallbackImage();
-        }
-      });
-    }
+    // 直接调用备用方法处理图像，无需获取MyHomePageState实例
+    _processFallbackImage();
   }
 
-  // 新增：备用图像处理方法(CV大法好,💩山代码发力了!!!)
+  // 新增：备用图像处理方法
   Future<void> _processFallbackImage() async {
     if (MyWifi.getCurrentImage().isEmpty) {
       print('备用方法：没有可用的图像');
@@ -363,6 +342,172 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       // 可以在这里处理UI更新等
       setState(() {});
     });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  // 添加文本控制器以供文本输入使用
+  final TextEditingController _questionController = TextEditingController();
+
+  // 图像解读方法 - 显示弹窗
+  Future<void> _saveCurrentImage() async {
+    // 检查是否有图像，无图像时使用应用图标
+    Uint8List? image;
+    bool usingAppIcon = false;
+
+    if (MyWifi.getCurrentImage().isEmpty) {
+      // 使用应用图标替代
+      usingAppIcon = true;
+    } else {
+      image = MyWifi.getCurrentImage();
+    }
+
+    // 重置问题文本
+    _questionController.text = '';
+
+    // 显示图像解读弹窗
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Container(
+                width: double.maxFinite,
+                padding: const EdgeInsets.all(16),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 图像显示 - 根据情况显示实际图像或应用图标
+                      Container(
+                        height: 200,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: usingAppIcon
+                            ? Image.asset(
+                                'assets/icon/icon.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  print('图标加载错误: $error');
+                                  // 提供备用图标或简单的容器
+                                  return Container(
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.image,
+                                      size: 100,
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                },
+                              )
+                            : Image.memory(
+                                image!,
+                                fit: BoxFit.contain,
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 文本编辑框
+                      TextField(
+                        controller: _questionController,
+                        decoration: const InputDecoration(
+                          hintText: '您想询问图片的什么内容？',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 千问识图按钮
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.search),
+                        label: const Text('千问识图'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(200, 45),
+                        ),
+                        onPressed: () async {
+                          // 关闭对话框
+                          Navigator.of(context).pop();
+
+                          // 获取用户问题
+                          String userQuestion = _questionController.text.trim();
+
+                          // 添加加载状态提示
+                          tts.TTS_speakText('正在分析图片，请稍候');
+
+                          try {
+                            final openAIService = OpenAIService();
+                            Uint8List imageToAnalyze;
+
+                            // 使用应用图标或相机图像
+                            if (usingAppIcon) {
+                              // 加载应用图标并转为二进制数据
+                              ByteData data =
+                                  await rootBundle.load('assets/icon/icon.png');
+                              imageToAnalyze = data.buffer.asUint8List();
+                            } else {
+                              imageToAnalyze = image!;
+                            }
+
+                            // 分析图像并回答问题
+                            final base64Image = base64Encode(imageToAnalyze);
+                            final result = await openAIService
+                                .analyzeImageWithQuestion(
+                                    base64Image, userQuestion)
+                                .timeout(const Duration(seconds: 30),
+                                    onTimeout: () {
+                              return "分析超时，请检查网络连接";
+                            });
+
+                            // 使用最高优先级播报结果
+                            await tts.TTS_speakHighestPriorityText(result);
+                          } catch (e) {
+                            print('图像处理失败: $e');
+                            tts.TTS_speakText('图片解读失败，请重试');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('处理失败: ${e.toString()}')),
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 关闭按钮
+                      TextButton(
+                        child: const Text(
+                          '关闭',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget buildImageWidget() {
@@ -561,7 +706,10 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                               ),
-                              onPressed: _saveCurrentImage,
+                              onPressed: () {
+                                // 实现图像解读逻辑
+                                _saveCurrentImage();
+                              },
                               child: const Text(
                                 '解 读',
                                 style: TextStyle(
@@ -678,40 +826,25 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       ),
     );
   }
+}
 
-  //💩山代码的父亲
-  Future<void> _saveCurrentImage() async {
-    if (MyWifi.getCurrentImage().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有可用的图像')),
-      );
-      tts.TTS_speakText('没有可用的图像');
-      return;
-    }
+// 添加新的处理无图像的方法
+Future<void> processFallbackImage() async {
+  // 打印日志
+  print('将使用APP图标进行解读');
 
-    Uint8List image = MyWifi.getCurrentImage();
+  try {
+    // 加载应用图标并转为二进制数据
+    ByteData data = await rootBundle.load('assets/icon/icon.png');
+    Uint8List imageBytes = data.buffer.asUint8List();
 
-    try {
-      final openAIService = OpenAIService();
-      final base64Image = base64Encode(image);
+    // 更新当前图像为APP图标
+    MyWifi.setCurrentImage(imageBytes);
 
-      // 添加加载状态提示
-      tts.TTS_speakText('图片分析中，请稍候');
-
-      final result = await openAIService
-          .analyzeImage(base64Image)
-          .timeout(const Duration(seconds: 30), onTimeout: () {
-        return "分析超时，请检查网络连接";
-      });
-
-      // 使用最高优先级播报完整文本，确保不被其他语音打断
-      await tts.TTS_speakHighestPriorityText(result);
-    } catch (e) {
-      print('图像处理失败: $e');
-      tts.TTS_speakText('图片解读失败，请重试');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('处理失败: ${e.toString()}')),
-      );
-    }
+    // 播放提示音
+    tts.TTS_speakText('已加载应用图标，准备进行解读');
+  } catch (e) {
+    print('无法加载应用图标: $e');
+    tts.TTS_speakText('无法加载图像，请重试');
   }
 }

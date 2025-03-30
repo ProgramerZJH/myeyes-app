@@ -16,7 +16,7 @@ class OpenAIService {
           model: const ChatCompletionModel.modelId("qwen-vl-plus"),
           messages: [
             const ChatCompletionMessage.system(
-              content: "你是一个专业的视觉辅助助手，需要为视障人士详细描述图片内容",
+              content: "你是一个专业的视觉辅助助手，根据图片内容为视障人士提供帮助",
             ),
             ChatCompletionMessage.user(
               content: ChatCompletionUserMessageContent.parts([
@@ -43,6 +43,42 @@ class OpenAIService {
     } catch (e) {
       print("图片分析失败: $e");
       return "图片分析失败，请稍后再试";
+    }
+  }
+
+  Future<String> analyzeImageWithQuestion(
+      String base64Image, String userQuestion) async {
+    try {
+      final res = await _client.createChatCompletion(
+        request: CreateChatCompletionRequest(
+          model: const ChatCompletionModel.modelId("qwen-vl-plus"),
+          messages: [
+            const ChatCompletionMessage.system(
+              content: "你是一个专业的视觉辅助助手，帮助视障用户理解图像内容并回答他们的问题",
+            ),
+            ChatCompletionMessage.user(
+              content: ChatCompletionUserMessageContent.parts([
+                ChatCompletionMessageContentPart.text(
+                  text: userQuestion.isNotEmpty
+                      ? "基于图片内容，请用中文回答我的问题：$userQuestion"
+                      : "请用中文详细描述这张图片的内容，适合盲人理解",
+                ),
+                ChatCompletionMessageContentPart.image(
+                  imageUrl: ChatCompletionMessageImageUrl(
+                    url: "data:image/jpeg;base64,$base64Image",
+                  ),
+                ),
+              ]),
+            ),
+          ],
+          temperature: 0.3,
+          maxTokens: 2000,
+        ),
+      );
+      return res.choices.first.message.content ?? "未获取到回答内容";
+    } catch (e) {
+      print("图片分析及问答失败: $e");
+      return "处理失败，请稍后再试";
     }
   }
 }

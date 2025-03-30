@@ -47,4 +47,5 @@ flutter:
   assets:
     - assets/                        # 通用资源目录
     - assets/tessdata/              # OCR模型数据目录
+    - assets/icon/                  # 图标资源目录
   uses-material-design: true        # 使用Material Design

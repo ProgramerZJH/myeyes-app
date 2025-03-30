@@ -32,6 +32,11 @@
     <!-- 声明应用支持BLE功能 -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
     
+    <!-- 移除语音识别相关权限 -->
+    <!-- <uses-permission android:name="android.permission.RECORD_AUDIO" /> -->
+    <!-- <uses-permission android:name="android.permission.MICROPHONE" /> -->
+    <!-- <uses-feature android:name="android.hardware.microphone" android:required="true" /> -->
+    
     <application
         android:name="${applicationName}"
         android:label="Hear the Vision"
