@@ -827,24 +827,3 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     );
   }
 }
-
-// 添加新的处理无图像的方法
-Future<void> processFallbackImage() async {
-  // 打印日志
-  print('将使用APP图标进行解读');
-
-  try {
-    // 加载应用图标并转为二进制数据
-    ByteData data = await rootBundle.load('assets/icon/icon.png');
-    Uint8List imageBytes = data.buffer.asUint8List();
-
-    // 更新当前图像为APP图标
-    MyWifi.setCurrentImage(imageBytes);
-
-    // 播放提示音
-    tts.TTS_speakText('已加载应用图标，准备进行解读');
-  } catch (e) {
-    print('无法加载应用图标: $e');
-    tts.TTS_speakText('无法加载图像，请重试');
-  }
-}
