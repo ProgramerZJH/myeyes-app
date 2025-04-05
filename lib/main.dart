@@ -96,12 +96,12 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: const ColorScheme.light(
-          primary: Colors.black,
-          secondary: Colors.black87,
-          surface: Colors.black87,
+          primary: Colors.pink,
+          secondary: Colors.black,
+          surface: Colors.white,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
-          onSurface: Colors.white,
+          onSurface: Colors.black,
         ),
       ),
       home: Builder(
@@ -492,7 +492,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: Colors.white,
+                            color: Colors.black,
                           ),
                         ),
                         onPressed: () {
@@ -543,7 +543,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                     children: [
                       Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey[200], // 容器的背景颜色
+                            color: Colors.red, // 修改为红色背景
                             borderRadius:
                                 BorderRadius.circular(15.0), // 设置圆角半径为 15.0
                           ),
@@ -551,7 +551,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                           width: 1000,
                           height: 50,
                           child: Text(
-                            '眼镜连接状态：${MyWifi.connect_state ? '已连接' : '未连接'}',
+                            '摄像头连接状态：${MyWifi.connect_state ? '已连接' : '未连接'}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 18, // 设置文字大小为18
@@ -565,6 +565,9 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                         width: 800,
                         height: 60,
                         child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange, // 设置为橙色
+                            ),
                             onPressed: () async {
                               const platform =
                                   MethodChannel('com.example.myeyes/hotspot');
@@ -586,7 +589,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                             child: const Text("连接热点",
                                 style: TextStyle(
                                   fontSize: 20,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ))),
                       ),
                       const SizedBox(height: 15),
@@ -594,6 +597,9 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                         width: 800,
                         height: 60,
                         child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.yellow, // 设置为黄色
+                            ),
                             onPressed: (MyWifi.connect_state || _isConnecting)
                                 ? null
                                 : () async {
@@ -648,7 +654,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                 Text(_isConnecting ? "正在连接..." : "open my eyes",
                                     style: const TextStyle(
                                       fontSize: 20,
-                                      color: Colors.white,
+                                      color: Colors.black,
                                     ))),
                       ),
                       const SizedBox(height: 15),
@@ -656,6 +662,9 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                         width: 800,
                         height: 60,
                         child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green, // 设置为绿色
+                            ),
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -666,7 +675,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                               '帮 助',
                               style: TextStyle(
                                 fontSize: 20,
-                                color: Colors.white,
+                                color: Colors.black,
                               ),
                             )),
                       ),
@@ -683,6 +692,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(15),
                                 ),
+                                backgroundColor: Colors.cyan, // 设置为青色（浅蓝）
                               ),
                               onPressed: () {
                                 SystemNavigator.pop();
@@ -691,7 +701,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                 '退 出',
                                 style: TextStyle(
                                   fontSize: 20,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ),
                               ),
                             ),
@@ -705,6 +715,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(15),
                                 ),
+                                backgroundColor: Colors.blue, // 设置为蓝色（深蓝）
                               ),
                               onPressed: () {
                                 // 实现图像解读逻辑
@@ -714,16 +725,17 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                 '解 读',
                                 style: TextStyle(
                                   fontSize: 20,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ),
                               ),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 15),
                       Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey[200],
+                            color: Colors.purple, // 修改为紫色背景
                             borderRadius: BorderRadius.circular(15.0),
                           ),
                           alignment: Alignment.center,
@@ -755,8 +767,10 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                             child: Column(
                               children: [
                                 const Text('雷达避障数据',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    )),
                                 Expanded(
                                   child: Column(
                                     children: List.generate(

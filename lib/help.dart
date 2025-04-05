@@ -425,7 +425,7 @@ class _HelpState extends State<Help> {
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: Colors.green,
                       borderRadius: BorderRadius.circular(15.0),
                     ),
                     alignment: Alignment.center,
@@ -435,7 +435,7 @@ class _HelpState extends State<Help> {
                       '点击查看使用说明及隐私合规',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontSize: 18,
                         color: Colors.black,
                       ),
                     ),
@@ -448,7 +448,7 @@ class _HelpState extends State<Help> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange, // 橙色背景
-                      foregroundColor: Colors.white, // 白色文字
+                      //foregroundColor: Colors.black,
                     ),
                     onPressed: () {
                       Navigator.pushNamed(context, '/navigation'); // 路由跳转
@@ -457,7 +457,7 @@ class _HelpState extends State<Help> {
                       '导航',
                       style: TextStyle(
                         fontSize: 30,
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -470,14 +470,14 @@ class _HelpState extends State<Help> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red, // 使用红色背景
-                      foregroundColor: Colors.white, // 使用白色文字
+                      //foregroundColor: Colors.black,
                     ),
                     onPressed: _showEmergencyDialog, // 添加点击事件
                     child: const Text(
                       '紧急援助(SOS)',
                       style: TextStyle(
                         fontSize: 30,
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -495,19 +495,19 @@ class _HelpState extends State<Help> {
                         width: 180,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: Colors.black,
+                          color: Colors.yellow,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Center(
                           child: weatherData.isEmpty
                               ? const Text(
                                   '加载中...',
-                                  style: TextStyle(color: Colors.white),
+                                  style: TextStyle(color: Colors.black),
                                 )
                               : const Text(
                                   '点击查看天气详情',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: Colors.black,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -529,7 +529,7 @@ class _HelpState extends State<Help> {
                         child: Text(
                           selectedCity,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.black,
                             fontSize: 12,
                           ),
                         ),
@@ -540,7 +540,7 @@ class _HelpState extends State<Help> {
 
                 Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey[200], // 容器的背景颜色
+                      color: Colors.pink, // 容器的背景颜色
                       borderRadius: BorderRadius.circular(15.0), // 设置圆角半径为 15.0
                     ),
                     alignment: Alignment.center,
@@ -550,7 +550,7 @@ class _HelpState extends State<Help> {
                       '开发团队:C204\n电子邮箱:jz659947@gmail.com\n联系电话:+8619133785078',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 18, // 设文字大小为18
+                        fontSize: 18,
                         color: Colors.black,
                       ),
                     )),

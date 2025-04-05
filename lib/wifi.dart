@@ -85,6 +85,9 @@ class WiFiClient {
       connect_state = true;
       print('Connected to server');
 
+      // 启动图像监控机制
+      _startImageMonitor();
+
       socket!.listen(
         (data) async {
           await handleIncomingData(data);
@@ -181,7 +184,7 @@ class WiFiClient {
     }
   }
 
-  // 添加图像监控机制
+  // 修改图像监控机制
   void _startImageMonitor() {
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_lastImageUpdate != null) {
@@ -198,6 +201,7 @@ class WiFiClient {
   Future<void> connect() async {
     try {
       socket = await Socket.connect(ip, port);
+      socket!.setOption(SocketOption.tcpNoDelay, true); // 禁用Nagle算法
       _startImageMonitor();
       // ... 其他连接代码 ...
     } catch (e) {
@@ -237,6 +241,10 @@ class WiFiClient {
             isProcessingImage = true;
 
             try {
+              // 立即更新图像流，减少延迟
+              imageStreamController.add(currentImageData);
+              _lastImageUpdate = DateTime.now();
+
               // 进行目标检测
               await MyDetection.Det_StartInference(currentImageData);
 
@@ -248,8 +256,7 @@ class WiFiClient {
                 // 直接编码为JPEG，不进行颜色空间转换
                 final (success, encodedBytes) = imencode('.jpg', mat);
                 if (success) {
-                  // 通过 Stream 发送图像数据
-                  imageStreamController.add(encodedBytes);
+                  // 通过 Stream 发送处理后的图像数据
                   processedImageData = encodedBytes;
                   //('图像处理成功');
                 } else {

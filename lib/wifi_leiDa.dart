@@ -134,8 +134,12 @@ class RadarClient {
             int rawValue = data[index].toInt();
             int distance = ((rawValue / 5.1) * (rawValue / 5.1)).round();
 
+            //规避数据处理出错导致distances=0而播报
+            if (distance == 0) {
+              distance = 9999;
+            }
             // 限制有效距离为2500毫米
-            if (distance > 2500 || distance <= 0) {
+            else if (distance > 2500) {
               distance = 2500; // 超出范围设为最大值
             }
 
