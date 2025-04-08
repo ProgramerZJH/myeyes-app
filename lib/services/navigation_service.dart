@@ -10,6 +10,7 @@ class NavigationService {
       'https://restapi.amap.com/v3/place/text'; // POI搜索API
   final String _routeUrl =
       'https://restapi.amap.com/v3/direction/walking'; // 步行路线规划API
+  final String _geocodeUrl = 'https://restapi.amap.com/v3/geocode/regeo';
 
   // 缓存相关变量
   final Map<String, dynamic> _searchCache = {}; // 搜索结果缓存
@@ -114,6 +115,28 @@ class NavigationService {
       }
     } catch (e) {
       throw Exception('获取地点详情失败: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getAddressFromLocation(
+      double lat, double lng) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_geocodeUrl?key=$_apiKey&location=$lng,$lat'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == '1') {
+          return data['regeocode'];
+        } else {
+          throw Exception('API返回错误: ${data['info']}');
+        }
+      } else {
+        throw Exception('获取地址失败: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('获取地址失败: $e');
     }
   }
 }

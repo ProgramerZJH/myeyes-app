@@ -42,11 +42,12 @@ class InstructionsPrivacyPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              '1. 主界面：点击"open my eyes"按钮连接设备，开始获取实时环境图像。\n\n'
-              '2. 导航功能：点击"导航"按钮进入导航界面，可搜索目的地并获取步行路线。\n\n'
+              '1. 主界面：点击"open my eyes"按钮连接连接到眼镜设备后，开始获取实时环境图像以及雷达距离矩阵。\n\n'
+              '2. 地图功能：点击"地图与位置信息"按钮进入导航界面，可获知当前位置信息，搜索目的地并获取步行路线。\n\n'
               '3. 紧急援助：点击"紧急援助(SOS)"按钮可快速拨打110、120或119电话。\n\n'
               '4. 天气查询：点击天气信息区域可查看详细天气预报。\n\n'
-              '5. 语音播报：应用会自动播报检测到的障碍物和重要信息。',
+              '5. 语音播报：应用会自动播报摄像头yolov5检测到的障碍物和重要信息，以及激光雷达检测到的近距离障碍物。\n\n'
+              '6. 智能识图：连接蓝牙或点击首页"解读"按钮可对拍摄画面进行预设或自定义解读。',
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 32),
@@ -109,7 +110,7 @@ class InstructionsPrivacyPage extends StatelessWidget {
                             onPressed: () => _launchURL(context,
                                 'https://github.com/ProgramerZJH/MyEyesPrivacy/blob/main/privacy_policy.md'),
                             child: const Text(
-                              'My Eyes\n隐私政策',
+                              '听见视界\n隐私政策',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white,

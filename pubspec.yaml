@@ -7,12 +7,12 @@ environment:
   sdk: '>=3.2.5 <4.0.0' # Flutter SDK版本要求
 
 dependencies:
-  flutter_lifecycle_detector: ^0.0.6  # 应用生命周期检测
+  #flutter_lifecycle_detector: ^0.0.6  # 应用生命周期检测
   network_info_plus: ^6.1.3          # 网络信息获取
   volume_control: ^0.1.5             # 音量控制
   app_settings: ^5.1.1               # 系统设置跳转
   permission_handler: ^11.4.0        # 权限管理
-  path_provider: ^2.1.2              # 文件路径管理
+  #path_provider: ^2.1.2              # 文件路径管理
   flutter_tts: ^4.2.2               # 文字转语音
   image_picker: ^1.1.2              # 图片选择器
   flutter_vision: ^1.1.4            # YOLOv5目标检测
@@ -22,7 +22,7 @@ dependencies:
   dio: ^5.4.0                       # 网络请求客户端
   http: ^1.1.0                      # HTTP请求
   cupertino_icons: ^1.0.2           # iOS风格图标 
-  amap_map: ^1.0.12                  # 使用确切版本号
+  amap_map: ^1.0.15                  # 使用确切版本号
   openai_dart: ^0.4.5
   
   opencv_dart: ^1.4.1               # OpenCV图像处理

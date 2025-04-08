@@ -454,7 +454,7 @@ class _HelpState extends State<Help> {
                       Navigator.pushNamed(context, '/navigation'); // 路由跳转
                     },
                     child: const Text(
-                      '导航',
+                      '地图与位置信息',
                       style: TextStyle(
                         fontSize: 30,
                         color: Colors.black,
@@ -547,7 +547,7 @@ class _HelpState extends State<Help> {
                     width: 400,
                     height: 100,
                     child: const Text(
-                      '开发团队:C204\n电子邮箱:jz659947@gmail.com\n联系电话:+8619133785078',
+                      '开发团队:C204\n电子邮箱:jz659947@gmail.com\n联系电话:(+86)19133785078',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,

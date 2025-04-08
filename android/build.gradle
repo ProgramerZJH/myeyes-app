@@ -1,12 +1,11 @@
 buildscript {
     ext.kotlin_version = '1.8.22'
     repositories {
+        google()
+        mavenCentral()
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://maven.aliyun.com/repository/jcenter") }
         maven { url = uri("https://maven.aliyun.com/repository/public") }
-        google()
-        mavenCentral()
-        maven { url 'https://maven.aliyun.com/repository/public' }
         maven { url 'https://storage.flutter-io.cn/download.flutter.io' }
     }
     dependencies {
@@ -17,6 +16,11 @@ buildscript {
 
 allprojects {
     repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/jcenter' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
         maven { url = uri("https://maven.aliyun.com/repository/public/") }
         maven { url = uri("https://maven.aliyun.com/repository/central") }
         maven { url = uri("https://repo.huaweicloud.com/repository/maven/") }
@@ -24,8 +28,6 @@ allprojects {
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://maven.aliyun.com/repository/jcenter") }
         maven { url = uri("https://maven.aliyun.com/repository/public") }
-        google()
-        mavenCentral()
         maven { url 'https://maven.aliyun.com/repository/public' }
         maven { url 'https://storage.flutter-io.cn/download.flutter.io' }
     }

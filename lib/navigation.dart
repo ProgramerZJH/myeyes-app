@@ -7,13 +7,15 @@ import 'package:amap_map/amap_map.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 //import 'package:shared_preferences/shared_preferences.dart';
 import 'package:myeyes/privacy_policy_dialog.dart'; // 添加这行
-import 'dart:math' show min, max;
+//import 'dart:math' show min, max;
+import 'package:myeyes/TTS.dart';
 
 /// 导航页面
 /// 提供基于高德地图的步行导航功能
 /// 包含地点搜索、路线规划等功能
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final TtsService tts = TtsService();
 
 class Navigation extends StatefulWidget {
   const Navigation({super.key});
@@ -31,18 +33,18 @@ class _NavigationState extends State<Navigation> {
   bool _isLoading = false; // 加载状态标志
   late AMapController _mapController;
   final List<Marker> _markers = [];
-  final List<Polyline> _polylines = [];
+  //final List<Polyline> _polylines = [];
   LatLng? _currentLatLng;
 
   // 添加审图号相关状态
-  //List<String> _approvalNumbers = [];
+  List<String> _approvalNumbers = [];
 
   @override
   void initState() {
     super.initState();
     // 立即初始化隐私合规
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initPrivacy();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _initPrivacy();
     });
   }
 
@@ -60,19 +62,24 @@ class _NavigationState extends State<Navigation> {
       );
 
       if (agreed == true) {
-        // 3. 初始化地图
+        // 初始化地图
         await _initMap();
       } else {
         Navigator.pop(context);
       }
     } catch (e) {
       print('隐私合规初始化失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('初始化失败: $e')),
+        );
+      }
     }
   }
 
   Future<void> _initMap() async {
     try {
-      // 2. 获取位置权限和位置信息
+      // 获取位置权限和位置信息
       await _getCurrentLocation();
     } catch (e) {
       print('地图初始化失败: $e');
@@ -95,19 +102,6 @@ class _NavigationState extends State<Navigation> {
         return;
       }
 
-      // 请求权限
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        return;
-      }
-
       // 获取位置
       final position = await Geolocator.getCurrentPosition();
       setState(() {
@@ -121,11 +115,6 @@ class _NavigationState extends State<Navigation> {
       setState(() => _isLoading = false);
     }
   }
-
-  /*Future<bool> _checkPrivacyAgreement() async {
-    // 移除缓存检查，每次都显示隐私弹窗
-    return false;
-  }*/
 
   void _updateCurrentMarker() {
     // 使用 _mapController 移动相机
@@ -159,104 +148,52 @@ class _NavigationState extends State<Navigation> {
   }
 
   /// 规划步行路线
-  /// [destination] 目的地信息
-  /// 使用高德地图步行路线规划API
   Future<void> _planRoute(Map<String, dynamic> destination) async {
     if (_currentPosition == null) return;
 
     setState(() {
       _isLoading = true;
-      _polylines.clear(); // 清除现有路线
     });
 
     try {
       final origin =
           '${_currentPosition!.longitude},${_currentPosition!.latitude}';
-      final dest = destination['location'];
-
-      if (dest == null) {
-        throw Exception('目的地坐标无效');
-      }
+      final dest = '${destination['location']}';
 
       final route = await _navigationService.getWalkingRoute(origin, dest);
-
-      if (route['route'] != null &&
-          route['route']['paths'] != null &&
-          (route['route']['paths'] as List).isNotEmpty) {
-        final path = route['route']['paths'][0];
-        final steps = path['steps'] as List;
-
-        // 收集所有路线点
-        List<LatLng> points = [];
-        for (var step in steps) {
-          if (step['polyline'] != null) {
-            final polyline = step['polyline'].toString().split(';');
-            for (var point in polyline) {
-              final coords = point.split(',');
-              if (coords.length == 2) {
-                try {
-                  final lat = double.parse(coords[1]);
-                  final lng = double.parse(coords[0]);
-                  points.add(LatLng(lat, lng));
-                } catch (e) {
-                  print('坐标解析错误: $e');
-                  continue;
-                }
-              }
-            }
-          }
-        }
-
-        if (points.isNotEmpty) {
-          setState(() {
-            // 使用更简单的路线样式
-            _polylines.add(
-              Polyline(
-                width: 10,
-                color: Colors.blue,
-                points: points,
-                // 移除可能导致崩溃的其他属性
-              ),
-            );
-            _selectedRoute = route;
-          });
-
-          // 调整地图视野以显示整个路线
-          if (points.length >= 2) {
-            double minLat = points.map((p) => p.latitude).reduce(min);
-            double maxLat = points.map((p) => p.latitude).reduce(max);
-            double minLng = points.map((p) => p.longitude).reduce(min);
-            double maxLng = points.map((p) => p.longitude).reduce(max);
-
-            LatLngBounds bounds = LatLngBounds(
-              southwest: LatLng(minLat, minLng),
-              northeast: LatLng(maxLat, maxLng),
-            );
-
-            _mapController.moveCamera(
-              CameraUpdate.newLatLngBounds(bounds, 50.0),
-            );
-          }
-        }
-      }
+      setState(() {
+        _selectedRoute = route;
+        _isLoading = false;
+      });
     } catch (e) {
       print('规划路线失败: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('获取路线失败: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _speakCurrentLocation() async {
+    if (_currentPosition == null) {
+      tts.TTS_speakText('正在获取位置信息，请稍候');
+      return;
+    }
+
+    try {
+      final result = await _navigationService.getAddressFromLocation(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+
+      final address = result['formatted_address'] ?? '未知位置';
+      tts.TTS_speakText('您当前位于$address');
+    } catch (e) {
+      print('获取地址失败: $e');
+      tts.TTS_speakText('获取位置信息失败，请重试');
     }
   }
 
   // 获取审图号
-  /*
   void _getApprovalNumber() async {
     try {
       // 尝试使用try-catch包装每个可能的API调用，防止某个方法不存在导致整个应用崩溃
@@ -288,13 +225,18 @@ class _NavigationState extends State<Navigation> {
       // 防止因为审图号崩溃影响整个应用
     }
   }
-  */
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('导航'),
+        title: const Text('地图与位置信息'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.location_on),
+            onPressed: _speakCurrentLocation,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -311,24 +253,20 @@ class _NavigationState extends State<Navigation> {
                         _updateCurrentMarker();
                       }
                       // 尝试获取审图号，但不影响地图主要功能
-                      /*
                       try {
                         _getApprovalNumber();
                       } catch (e) {
                         print('审图号初始化失败: $e');
                       }
-                      */
                     });
                   },
-                  /*
                   compassEnabled: true,
                   scaleEnabled: true,
                   zoomGesturesEnabled: true,
                   scrollGesturesEnabled: true,
                   rotateGesturesEnabled: true,
-                  */
                   markers: Set<Marker>.of(_markers),
-                  polylines: Set<Polyline>.of(_polylines),
+                  //polylines: Set<Polyline>.of(_polylines),
                   initialCameraPosition: CameraPosition(
                     target:
                         _currentLatLng ?? const LatLng(39.90960, 116.397228),
@@ -337,7 +275,6 @@ class _NavigationState extends State<Navigation> {
                   //myLocationStyleOptions: MyLocationStyleOptions(true),
                 ),
                 // 显示审图号
-                /*
                 if (_approvalNumbers.isNotEmpty)
                   Positioned(
                     right: 10,
@@ -357,7 +294,6 @@ class _NavigationState extends State<Navigation> {
                       ),
                     ),
                   )
-                */
               ],
             ),
           ),
@@ -388,7 +324,11 @@ class _NavigationState extends State<Navigation> {
                   return ListTile(
                     title: Text(place['name'] ?? ''),
                     subtitle: Text(place['address'] ?? ''),
-                    onTap: () => _planRoute(place),
+                    onTap: () {
+                      _planRoute(place);
+                      tts.TTS_speakText(
+                          '已选择${place['name']}，位于${place['address']}');
+                    },
                   );
                 },
               ),
@@ -398,7 +338,7 @@ class _NavigationState extends State<Navigation> {
           if (_selectedRoute != null)
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.all(4.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -409,12 +349,12 @@ class _NavigationState extends State<Navigation> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       '总距离: ${_selectedRoute!['route']['paths'][0]['distance']}米\n'
                       '预计时间: ${_selectedRoute!['route']['paths'][0]['duration']}秒',
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Expanded(
                       child: ListView.builder(
                         itemCount: _selectedRoute!['route']['paths'][0]['steps']

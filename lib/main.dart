@@ -586,7 +586,7 @@ class MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                                 tts.TTS_speakText('开启热点失败，请手动开启');
                               }
                             },
-                            child: const Text("连接热点",
+                            child: const Text("热点设置",
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.black,
